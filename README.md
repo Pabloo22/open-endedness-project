@@ -20,6 +20,11 @@ We use Poetry version 1.x to manage dependencies and virtual environments. To in
 ```
 poetry install
 ```
+or
+```
+poetry install --with notebooks
+```
+if you want to include the dependencies for the notebooks.
 
 Jax is not included because it has different installation instructions depending on the platform and hardware. For example, if you have an Nvidia GPU with CUDA 13, run:
 ```
