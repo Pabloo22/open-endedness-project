@@ -1,6 +1,6 @@
 # Merging Intrinsic and Extrinsic Rewards in Reinforcement Learning
 
-## Repo Strucucture
+## Repo Structure
 ```bash
 .
 ├── LICENSE
