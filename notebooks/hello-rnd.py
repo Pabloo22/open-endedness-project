@@ -12,7 +12,7 @@ import optax
 from matplotlib import pyplot as plt
 
 
-# 1. Define target and predcitor network
+# 1. Define target and predictor networks, most of the time have same architecture
 class RNDNetwork(nn.Module):
     @nn.compact
     def __call__(self, x):
@@ -64,7 +64,7 @@ def train_step(predictor_params, opt_state, target_params, states):
     # Compute the loss with respect to the predictor network using custom loss_fn
     loss, grads = jax.value_and_grad(loss_fn)(
         predictor_params, target_params, states
-    )  # Compute loss
+    )
     updates, opt_state = optimizer.update(grads, opt_state)  # prepare updates
     predictor_params = optax.apply_updates(predictor_params, updates)
     return predictor_params, opt_state, loss
@@ -85,7 +85,7 @@ for i in range(500):
 
 # Visualize the HeatMap for intrinsic reward
 print(
-    "The Cyan dashed lines show the training regions i.e. the regions where the target network is able to memorize the predictor network."
+    "The region closed by the cyan dashed lines show the training regions i.e. the regions where the predictor network is able to memorize the random network."
 )
 x = jnp.linspace(-2, 2, 100)
 y = jnp.linspace(-2, 2, 100)
@@ -106,5 +106,4 @@ plt.axhline(y=0, color="cyan", linestyle="--", alpha=0.5)
 plt.axhline(y=1, color="cyan", linestyle="--", alpha=0.5)
 plt.axvline(x=0, color="cyan", linestyle="--", alpha=0.5)
 plt.axvline(x=1, color="cyan", linestyle="--", alpha=0.5)
-plt.savefig("rnd_heatmap.png", dpi=150)
 plt.show()
