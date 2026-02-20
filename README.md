@@ -31,3 +31,10 @@ Jax is not included because it has different installation instructions depending
 poetry shell
 pip install -U "jax[cuda13]"
 ```
+
+ ## Acknowledgments
+
+ The code for the policies' base Transformer-XL architecture, and the code in `ppo_update.py` is inspired from [transformerXL_PPO_JAX](https://github.com/Reytuag/transformerXL_PPO_JAX/tree/main), which itself acknowledges the following sources of inspiration:
+- [PureJaxRL](https://github.com/luchris429/purejaxrl)
+- [Huggingface transformerXL](https://github.com/huggingface/transformers/blob/v4.40.1/src/transformers/models/deprecated/transfo_xl/modeling_transfo_xl.py)
+- https://github.com/MarcoMeter/episodic-transformer-memory-ppo

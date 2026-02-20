@@ -205,3 +205,13 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+
+
+##--##
+AGENTS.md
+notes.txt
+implementation_details_and_instructions/
+ruff.toml
+PLAN.md
+##--##
