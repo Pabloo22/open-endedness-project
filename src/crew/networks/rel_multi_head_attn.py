@@ -26,7 +26,8 @@
 
 
 """Relative Attention HEAVILY INSPIRED FROM https://github.com/huggingface/transformers/blob/v4.40.1/src/transformers/models/deprecated/transfo_xl/modeling_transfo_xl.py
-, flax attention, https://github.com/kimiyoung/transformer-xl/blob/master/pytorch/mem_transformer.py#L143, most of the time just a flax/jax conversion"""
+, flax attention, https://github.com/kimiyoung/transformer-xl/blob/master/pytorch/mem_transformer.py#L143, most of the time just a flax/jax conversion
+"""
 
 ###########################################
 
@@ -38,7 +39,12 @@ import jax
 import jax.numpy as jnp
 from flax.linen import initializers
 from flax.linen.dtypes import promote_dtype
-from flax.linen.linear import DenseGeneral, DotGeneralT, PrecisionLike, default_kernel_init
+from flax.linen.linear import (
+    DenseGeneral,
+    DotGeneralT,
+    PrecisionLike,
+    default_kernel_init,
+)
 from flax.linen.module import Module, compact, merge_param
 from jax import lax, random
 
@@ -76,11 +82,17 @@ def dot_product_attention_weights(
 
     depth = query.shape[-1]
 
-    attn_weights = jnp.einsum("...qhd,...khd->...hqk", query + r_w_bias, key, precision=precision)
+    attn_weights = jnp.einsum(
+        "...qhd,...khd->...hqk", query + r_w_bias, key, precision=precision
+    )
 
-    attn_weights_r = jnp.einsum("...qhd,khd->...hqk", query + r_r_bias, r_pos_embed, precision=precision)
+    attn_weights_r = jnp.einsum(
+        "...qhd,khd->...hqk", query + r_r_bias, r_pos_embed, precision=precision
+    )
 
-    attn_weights_r = roll_vmap(attn_weights_r, jnp.arange(0, query.shape[-3]) - (query.shape[-3] - 1), -1)
+    attn_weights_r = roll_vmap(
+        attn_weights_r, jnp.arange(0, query.shape[-3]) - (query.shape[-3] - 1), -1
+    )
     attn_weights = attn_weights + attn_weights_r
 
     attn_weights = attn_weights / jnp.sqrt(depth).astype(dtype)
@@ -126,8 +138,12 @@ def dot_product_attention(
     query, key, value = promote_dtype(query, key, value, dtype=dtype)
     dtype = query.dtype
     assert key.ndim == query.ndim == value.ndim, "q, k, v must have same rank."
-    assert query.shape[:-3] == key.shape[:-3] == value.shape[:-3], "q, k, v batch dims must match."
-    assert query.shape[-2] == key.shape[-2] == value.shape[-2], "q, k, v num_heads must match."
+    assert (
+        query.shape[:-3] == key.shape[:-3] == value.shape[:-3]
+    ), "q, k, v batch dims must match."
+    assert (
+        query.shape[-2] == key.shape[-2] == value.shape[-2]
+    ), "q, k, v num_heads must match."
     assert key.shape[-3] == value.shape[-3], "k, v lengths must match."
 
     # compute attention weights
@@ -183,7 +199,9 @@ class RelMultiHeadDotProductAttention(Module):
         """Applies multi-head dot product attention on the input data."""
         features = self.out_features or inputs_q.shape[-1]
         qkv_features = self.qkv_features or inputs_q.shape[-1]
-        assert qkv_features % self.num_heads == 0, f"Memory dimension ({qkv_features}) must be divisible by number of heads ({self.num_heads})."
+        assert (
+            qkv_features % self.num_heads == 0
+        ), f"Memory dimension ({qkv_features}) must be divisible by number of heads ({self.num_heads})."
         head_dim = qkv_features // self.num_heads
 
         dense = functools.partial(
@@ -231,9 +249,15 @@ class RelMultiHeadDotProductAttention(Module):
 
         if self.decode:
             is_initialized = self.has_variable("cache", "cached_key")
-            cached_key = self.variable("cache", "cached_key", jnp.zeros, key.shape, key.dtype)
-            cached_value = self.variable("cache", "cached_value", jnp.zeros, value.shape, value.dtype)
-            cache_index = self.variable("cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32))
+            cached_key = self.variable(
+                "cache", "cached_key", jnp.zeros, key.shape, key.dtype
+            )
+            cached_value = self.variable(
+                "cache", "cached_value", jnp.zeros, value.shape, value.dtype
+            )
+            cache_index = self.variable(
+                "cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32)
+            )
             if is_initialized:
                 (
                     *batch_dims,
@@ -243,7 +267,10 @@ class RelMultiHeadDotProductAttention(Module):
                 ) = cached_key.value.shape
                 expected_shape = (*tuple(batch_dims), 1, num_heads, depth_per_head)
                 if expected_shape != query.shape:
-                    raise ValueError("Autoregressive cache shape error, expected query shape %s instead got %s." % (expected_shape, query.shape))
+                    raise ValueError(
+                        "Autoregressive cache shape error, expected query shape %s instead got %s."
+                        % (expected_shape, query.shape)
+                    )
 
                 cur_index = cache_index.value
                 indices = (0,) * len(batch_dims) + (cur_index, 0, 0)
@@ -263,7 +290,9 @@ class RelMultiHeadDotProductAttention(Module):
 
         dropout_rng = None
         if self.dropout_rate > 0.0:
-            m_deterministic = merge_param("deterministic", self.deterministic, deterministic)
+            m_deterministic = merge_param(
+                "deterministic", self.deterministic, deterministic
+            )
             if not m_deterministic:
                 dropout_rng = self.make_rng("dropout")
         else:
@@ -305,7 +334,9 @@ def combine_masks(*masks: Array | None, dtype: Dtype = jnp.float32) -> Array:
     masks_list = [m for m in masks if m is not None]
     if not masks_list:
         return None
-    assert all(x.ndim == masks_list[0].ndim for x in masks_list), f"masks must have same rank: {tuple(x.ndim for x in masks_list)}"
+    assert all(
+        x.ndim == masks_list[0].ndim for x in masks_list
+    ), f"masks must have same rank: {tuple(x.ndim for x in masks_list)}"
     mask, *other_masks = masks_list
     for other_mask in other_masks:
         mask = jnp.logical_and(mask, other_mask)

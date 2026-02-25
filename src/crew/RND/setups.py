@@ -131,9 +131,7 @@ def set_up_for_training(config: TrainConfig):
     base_env = make_craftax_env_from_name(config.env_id, auto_reset=False)
     env_params = base_env.default_params
     if config.episode_max_steps:
-        env_params = env_params.replace(
-            max_timesteps=config.episode_max_steps
-        )
+        env_params = env_params.replace(max_timesteps=config.episode_max_steps)
     # Keep env parallelism explicit in rollout/eval code via jax.vmap.
     env = AutoResetEnvWrapper(base_env)
 
@@ -165,7 +163,8 @@ def set_up_for_training(config: TrainConfig):
         rng, env, env_params, config
     )
 
-    # setup rnd target network train state. Note we store the parameters in a TrainState for convenience, even if the parameters are never updated
+    # setup rnd target network train state. Note we store the parameters in a TrainState
+    # for convenience, even if the parameters are never updated
     rng, target_train_state = setup_target_train_state(rng, env, env_params, config)
 
     return (

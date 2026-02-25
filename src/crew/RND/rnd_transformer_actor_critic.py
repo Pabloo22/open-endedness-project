@@ -7,7 +7,8 @@ from flax.linen.initializers import constant, orthogonal
 
 from crew.networks.transformer_xl_base import Transformer_XL
 
-## Only difference over standard network for standard ppo is that two value heads are used.
+# Only difference over standard network for standard ppo is that two value heads are
+# used.
 
 # ----------------- Actor Critic Transformer  ---------------------------
 
@@ -187,7 +188,9 @@ class ActorCriticTransformer(nn.Module):
         )
 
     def model_forward_train(self, memories, input, mask):
-        x = self.transformer.forward_train(memories, self._encode_train_input(input), mask)
+        x = self.transformer.forward_train(
+            memories, self._encode_train_input(input), mask
+        )
 
         actor = self.actor_linear1(x)
         actor = self.activation_fn(actor)

@@ -76,7 +76,9 @@ def full_training_on_fixed_envs(
     ):
         # Train
         runner_state, metrics = jax.lax.scan(
-            Partial(collect_data_and_update, env=env, env_params=env_params, config=config),
+            Partial(
+                collect_data_and_update, env=env, env_params=env_params, config=config
+            ),
             runner_state,
             None,
             config.num_updates_per_batch,

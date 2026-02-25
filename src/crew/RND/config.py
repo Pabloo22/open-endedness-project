@@ -89,7 +89,9 @@ class TrainConfig:
             msg = f"num_envs_per_batch ({self.num_envs_per_batch}) must be divisible by num_minibatches ({self.num_minibatches})."
             raise ValueError(msg)
 
-        self.num_batches_of_envs = math.ceil(self.total_timesteps / (self.num_envs_per_batch * self.num_steps_per_env))
+        self.num_batches_of_envs = math.ceil(
+            self.total_timesteps / (self.num_envs_per_batch * self.num_steps_per_env)
+        )
         self.num_updates_per_batch = self.num_steps_per_env // self.num_steps_per_update
         # checks
         if self.num_steps_per_env % self.num_steps_per_update != 0:

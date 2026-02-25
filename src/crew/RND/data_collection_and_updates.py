@@ -79,9 +79,9 @@ def step_envs(runner_state, unused, env, env_params, config):
     # step_rngs: [num_envs], prev_obs/next_obs: [num_envs, obs_dim], done/reward: [num_envs]
     rng, step_rng_base = jax.random.split(rng)
     step_rngs = jax.random.split(step_rng_base, num=config.num_envs_per_batch)
-    next_obs, env_state, reward, done, _ = jax.vmap(
-        env.step, in_axes=(0, 0, 0, None)
-    )(step_rngs, env_state, action, env_params)
+    next_obs, env_state, reward, done, _ = jax.vmap(env.step, in_axes=(0, 0, 0, None))(
+        step_rngs, env_state, action, env_params
+    )
 
     memory_indices = jnp.arange(0, config.past_context_length)[
         None, :

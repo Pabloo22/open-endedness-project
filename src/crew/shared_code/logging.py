@@ -7,18 +7,30 @@ import wandb
 
 
 def generate_run_name(algorithm_name, config, prefix=""):
-    run_name = prefix + f"|{config.env_id}|" + algorithm_name + f"seed{config.train_seed}||"
+    run_name = (
+        prefix + f"|{config.env_id}|" + algorithm_name + f"seed{config.train_seed}||"
+    )
     return run_name
 
 
 # -----------------------------------------------------------------------------------------------
 
 
-def wandb_log_training_metrics(metrics, config, run_name, project_name="open_endedness", num_final_episodes_for_evaluating_performance=None, extra_batch_metrics=None, tags=None):
+def wandb_log_training_metrics(
+    metrics,
+    config,
+    run_name,
+    project_name="open_endedness",
+    num_final_episodes_for_evaluating_performance=None,
+    extra_batch_metrics=None,
+    tags=None,
+):
     run = None
 
     try:
-        run = wandb.init(project=project_name, name=run_name, tags=tags, config=asdict(config))
+        run = wandb.init(
+            project=project_name, name=run_name, tags=tags, config=asdict(config)
+        )
         # setup
         num_batches = metrics["total_loss"].shape[0]
         eval_returns_data = metrics["eval/returns"]
@@ -26,7 +38,10 @@ def wandb_log_training_metrics(metrics, config, run_name, project_name="open_end
         if num_final_episodes_for_evaluating_performance is None:
             final_k_episodes = eval_returns_data.shape[2]  # evaluate over all episodes
         else:
-            final_k_episodes = min(num_final_episodes_for_evaluating_performance, eval_returns_data.shape[2])
+            final_k_episodes = min(
+                num_final_episodes_for_evaluating_performance,
+                eval_returns_data.shape[2],
+            )
 
         #### log plots of metrics during training ####
 
@@ -38,10 +53,18 @@ def wandb_log_training_metrics(metrics, config, run_name, project_name="open_end
 
         eval_returns_mean = eval_returns_data.mean(1)[:, -final_k_episodes:].mean(1)
         eval_lengths_mean = eval_lengths_data.mean(1)[:, -final_k_episodes:].mean(1)
-        eval_lengths_20percentile = jnp.percentile(eval_lengths_data, q=20, axis=1)[:, -final_k_episodes:].mean(1)
-        eval_lengths_40percentile = jnp.percentile(eval_lengths_data, q=40, axis=1)[:, -final_k_episodes:].mean(1)
-        eval_lengths_60percentile = jnp.percentile(eval_lengths_data, q=60, axis=1)[:, -final_k_episodes:].mean(1)
-        eval_lengths_80percentile = jnp.percentile(eval_lengths_data, q=80, axis=1)[:, -final_k_episodes:].mean(1)
+        eval_lengths_20percentile = jnp.percentile(eval_lengths_data, q=20, axis=1)[
+            :, -final_k_episodes:
+        ].mean(1)
+        eval_lengths_40percentile = jnp.percentile(eval_lengths_data, q=40, axis=1)[
+            :, -final_k_episodes:
+        ].mean(1)
+        eval_lengths_60percentile = jnp.percentile(eval_lengths_data, q=60, axis=1)[
+            :, -final_k_episodes:
+        ].mean(1)
+        eval_lengths_80percentile = jnp.percentile(eval_lengths_data, q=80, axis=1)[
+            :, -final_k_episodes:
+        ].mean(1)
 
         for i in range(num_batches):
             batch_logs = {
@@ -73,11 +96,21 @@ def wandb_log_training_metrics(metrics, config, run_name, project_name="open_end
         num_episodes = eval_returns_data.shape[2]
 
         # metrics to plot
-        eval_episodes_lengths_mean = eval_lengths_data.mean(1)[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
-        eval_episodes_lengths_20percentile = jnp.percentile(eval_lengths_data, q=20, axis=1)[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
-        eval_episodes_lengths_40percentile = jnp.percentile(eval_lengths_data, q=40, axis=1)[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
-        eval_episodes_lengths_60percentile = jnp.percentile(eval_lengths_data, q=60, axis=1)[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
-        eval_episodes_lengths_80percentile = jnp.percentile(eval_lengths_data, q=80, axis=1)[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
+        eval_episodes_lengths_mean = eval_lengths_data.mean(1)[
+            batches_for_evaluation[0] : batches_for_evaluation[1]
+        ].mean(0)
+        eval_episodes_lengths_20percentile = jnp.percentile(
+            eval_lengths_data, q=20, axis=1
+        )[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
+        eval_episodes_lengths_40percentile = jnp.percentile(
+            eval_lengths_data, q=40, axis=1
+        )[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
+        eval_episodes_lengths_60percentile = jnp.percentile(
+            eval_lengths_data, q=60, axis=1
+        )[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
+        eval_episodes_lengths_80percentile = jnp.percentile(
+            eval_lengths_data, q=80, axis=1
+        )[batches_for_evaluation[0] : batches_for_evaluation[1]].mean(0)
 
         for i in range(num_episodes):
             wandb.log(

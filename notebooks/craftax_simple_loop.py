@@ -22,7 +22,9 @@ class Config:
     num_steps_per_env: int = 1024
 
     def __post_init__(self):
-        self.num_batches_of_envs = math.ceil(self.total_timesteps / (self.num_parallel_envs * self.num_steps_per_env))
+        self.num_batches_of_envs = math.ceil(
+            self.total_timesteps / (self.num_parallel_envs * self.num_steps_per_env)
+        )
 
 
 def step_envs_random(runner_state, _, env, env_params, config):
@@ -31,9 +33,13 @@ def step_envs_random(runner_state, _, env, env_params, config):
     step_rngs = jax.random.split(step_rng, config.num_parallel_envs)
 
     num_actions = env.action_space(env_params).n
-    actions = jax.random.randint(action_rng, (config.num_parallel_envs,), minval=0, maxval=num_actions)
+    actions = jax.random.randint(
+        action_rng, (config.num_parallel_envs,), minval=0, maxval=num_actions
+    )
 
-    obs, next_state, reward, done, info = jax.vmap(env.step, in_axes=(0, 0, 0, None))(step_rngs, state, actions, env_params)
+    obs, next_state, reward, done, info = jax.vmap(env.step, in_axes=(0, 0, 0, None))(
+        step_rngs, state, actions, env_params
+    )
     return (rng, next_state), None
 
 
@@ -67,7 +73,9 @@ def speed_experiment_random_policy(config: Config):
 
     # Compile + warmup once.
     compile_t0 = time.perf_counter()
-    jitted_collect_data_random = jax.jit(Partial(collect_data_random, env=env, env_params=env_params, config=config))
+    jitted_collect_data_random = jax.jit(
+        Partial(collect_data_random, env=env, env_params=env_params, config=config)
+    )
     runner_state = jitted_collect_data_random(runner_state)
     jax.tree_util.tree_map(lambda x: x.block_until_ready(), runner_state)
     compile_time = time.perf_counter() - compile_t0
@@ -79,7 +87,9 @@ def speed_experiment_random_policy(config: Config):
     jax.tree_util.tree_map(lambda x: x.block_until_ready(), runner_state)
     run_time = time.perf_counter() - run_t0
 
-    executed_timesteps = config.num_batches_of_envs * config.num_parallel_envs * config.num_steps_per_env
+    executed_timesteps = (
+        config.num_batches_of_envs * config.num_parallel_envs * config.num_steps_per_env
+    )
     print("=== Craftax Random Policy Data Collection Speed ===")
     print(f"Device: {jax.default_backend()}")
     print(f"total_timesteps: {executed_timesteps}")
@@ -93,7 +103,9 @@ def speed_experiment_random_policy(config: Config):
 
 
 def _parse_args() -> Config:
-    parser = argparse.ArgumentParser(description="Craftax data collection speed benchmark.")
+    parser = argparse.ArgumentParser(
+        description="Craftax data collection speed benchmark."
+    )
     parser.add_argument(
         "--experiment",
         type=str,
