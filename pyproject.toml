@@ -13,7 +13,6 @@ packages = [
 python = "^3.12"
 optax = ">=0.2.4"
 flax = ">=0.10.3"
-jax = {version = ">=0.4.38", extras = ["cuda12"]}
 distrax = ">=0.1.5"
 chex = ">=0.1.88"
 orbax-checkpoint = ">=0.11.5"
@@ -27,6 +26,21 @@ ipykernel = "^7.2.0"
 matplotlib = "^3.10.8"
 jupyter = "^1.1.1"
 wandb = "^0.25.0"
+
+
+[tool.poetry.group.dev.dependencies]
+black = {extras = ["jupyter"], version = "^26.1.0"}
+
+[tool.mypy]
+ignore_missing_imports = true
+
+[tool.pylint.messages_control]
+disable = [
+  "missing-module-docstring",
+  "missing-class-docstring",
+  "missing-function-docstring",
+  "attribute-defined-outside-init",
+]
 
 [build-system]
 requires = ["poetry-core"]
