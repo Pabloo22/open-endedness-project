@@ -16,7 +16,7 @@
 ```
 
 ## Installation
-We use Poetry version 1.x to manage dependencies and virtual environments. To install the project, run the following command in the terminal:
+We use Poetry version 2.x to manage dependencies and virtual environments. To install the project, run the following command in the terminal:
 ```
 poetry install
 ```
