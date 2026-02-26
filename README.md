@@ -29,6 +29,7 @@ if you want to include the dependencies for the notebooks.
 Jax is not included because it has different installation instructions depending on the platform and hardware. For example, if you have an Nvidia GPU with CUDA 13, run:
 ```
 poetry shell
+# poetry run pip install "jax[cuda12]>=0.4.38"
 pip install -U "jax[cuda13]"
 ```
 
