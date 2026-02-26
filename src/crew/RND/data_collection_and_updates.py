@@ -12,7 +12,7 @@ from crew.RND.ppo_update import calculate_gae, update_epoch
 from crew.RND.rnd_transformer_actor_critic import ActorCriticTransformer
 from crew.shared_code.trainsition_objects import Transition_data_rnd
 
-#############-------------------------------
+#############------------------------------
 
 
 def step_envs(runner_state, unused, env, env_params, config):
@@ -50,12 +50,8 @@ def step_envs(runner_state, unused, env, env_params, config):
         ),
         memories_mask,
     )
-    memories_mask_idx_ohot = jax.nn.one_hot(
-        memories_mask_idx, config.past_context_length + 1
-    )
-    memories_mask_idx_ohot = memories_mask_idx_ohot[:, None, None, :].repeat(
-        config.num_attn_heads, 1
-    )
+    memories_mask_idx_ohot = jax.nn.one_hot(memories_mask_idx, config.past_context_length + 1)
+    memories_mask_idx_ohot = memories_mask_idx_ohot[:, None, None, :].repeat(config.num_attn_heads, 1)
     memories_mask = jnp.logical_or(memories_mask, memories_mask_idx_ohot)
 
     # --------------------------
@@ -79,15 +75,9 @@ def step_envs(runner_state, unused, env, env_params, config):
     # step_rngs: [num_envs], prev_obs/next_obs: [num_envs, obs_dim], done/reward: [num_envs]
     rng, step_rng_base = jax.random.split(rng)
     step_rngs = jax.random.split(step_rng_base, num=config.num_envs_per_batch)
-    next_obs, env_state, reward, done, _ = jax.vmap(env.step, in_axes=(0, 0, 0, None))(
-        step_rngs, env_state, action, env_params
-    )
+    next_obs, env_state, reward, done, _ = jax.vmap(env.step, in_axes=(0, 0, 0, None))(step_rngs, env_state, action, env_params)
 
-    memory_indices = jnp.arange(0, config.past_context_length)[
-        None, :
-    ] + current_update_step_num * jnp.ones(
-        (config.num_envs_per_batch, 1), dtype=jnp.int32
-    )
+    memory_indices = jnp.arange(0, config.past_context_length)[None, :] + current_update_step_num * jnp.ones((config.num_envs_per_batch, 1), dtype=jnp.int32)
 
     # Store transition data
     transition = Transition_data_rnd(
@@ -102,9 +92,7 @@ def step_envs(runner_state, unused, env, env_params, config):
         next_obs=next_obs,
         intrinsic_reward=jnp.zeros_like(reward),
         intrinsic_value=value_intrinsic,
-        done_for_intrinsic=jnp.zeros_like(
-            done
-        ),  # set always to false because we optimize rnd intrinsic rewards across episodes
+        done_for_intrinsic=jnp.zeros_like(done),  # set always to false because we optimize rnd intrinsic rewards across episodes
     )
 
     # create updated runner state
@@ -167,9 +155,7 @@ def update_agent(runner_state, transitions, memories_batch, config):
         memories_mask,
         method=ActorCriticTransformer.model_forward_eval,
     )  # _, (num_envs), _
-    advantages_ext, targets_ext = calculate_gae(
-        transitions, last_val, config.gamma, config.gae_lambda
-    )
+    advantages_ext, targets_ext = calculate_gae(transitions, last_val, config.gamma, config.gae_lambda)
     intrinsic_view = transitions.replace(
         reward=transitions.intrinsic_reward,
         value=transitions.intrinsic_value,
@@ -182,9 +168,7 @@ def update_agent(runner_state, transitions, memories_batch, config):
         config.gae_lambda_intrinsic,
     )
 
-    advantages = (
-        config.extrinsic_coef * advantages_ext + config.intrinsic_coef * advantages_int
-    )  # (num_steps, num_envs)
+    advantages = config.extrinsic_coef * advantages_ext + config.intrinsic_coef * advantages_int  # (num_steps, num_envs)
     targets = {
         "extrinsic": targets_ext,
         "intrinsic": targets_int,
@@ -192,9 +176,7 @@ def update_agent(runner_state, transitions, memories_batch, config):
 
     # Compute loss and update network
     update_state = (rng, train_state, transitions, memories_batch, advantages, targets)
-    update_state, metrics = jax.lax.scan(
-        Partial(update_epoch, config=config), update_state, None, config.update_epochs
-    )
+    update_state, metrics = jax.lax.scan(Partial(update_epoch, config=config), update_state, None, config.update_epochs)
     rng, train_state = update_state[:2]
 
     runner_state = (
@@ -265,13 +247,9 @@ def update_rnd_predictor(runner_state, transitions, config):
 
 
 def collect_data_and_update(runner_state, _unused, env, env_params, config):
-    memories_previous = runner_state[
-        8
-    ]  # (batch_size, past_context_length, num_tranformer_layers, hidden_dim)
+    memories_previous = runner_state[8]  # (batch_size, past_context_length, num_tranformer_layers, hidden_dim)
 
-    runner_state, transitions, memories_batch = collect_data(
-        runner_state, config.num_steps_per_update, env, env_params, config
-    )
+    runner_state, transitions, memories_batch = collect_data(runner_state, config.num_steps_per_update, env, env_params, config)
 
     # compute raw rnd intrinsic rewards
     rnd_intrinsic_rewards = compute_rnd_intrinsic_rewards(
@@ -282,25 +260,17 @@ def collect_data_and_update(runner_state, _unused, env, env_params, config):
     )  # (seq_len, batch_size)
 
     # normalize intrinsic rewards and update the transitions pytree
-    runner_state, normalized_rnd_intrinsic_rewards = normalize_rnd_intrinsic_rewards(
-        runner_state, rnd_intrinsic_rewards, config
-    )
+    runner_state, normalized_rnd_intrinsic_rewards = normalize_rnd_intrinsic_rewards(runner_state, rnd_intrinsic_rewards, config)
     transitions = transitions.replace(intrinsic_reward=normalized_rnd_intrinsic_rewards)
 
     # Concatenate previous memory with new batch
-    memories_batch = jnp.concatenate(
-        [jnp.swapaxes(memories_previous, 0, 1), memories_batch], axis=0
-    )  # (past_context + num_steps_per_update, num_envs, num_tranformer_layers, hidden_dim)
+    memories_batch = jnp.concatenate([jnp.swapaxes(memories_previous, 0, 1), memories_batch], axis=0)  # (past_context + num_steps_per_update, num_envs, num_tranformer_layers, hidden_dim)
 
     # update policy and value networks
-    runner_state, metrics = update_agent(
-        runner_state, transitions, memories_batch, config
-    )
+    runner_state, metrics = update_agent(runner_state, transitions, memories_batch, config)
 
     # update rnd predictor network
-    runner_state, predictor_loss_value = update_rnd_predictor(
-        runner_state, transitions, config
-    )
+    runner_state, predictor_loss_value = update_rnd_predictor(runner_state, transitions, config)
 
     metrics.update(
         {
@@ -322,27 +292,17 @@ def compute_rnd_intrinsic_rewards(
 ) -> jnp.ndarray:
     # (S, B, ...) -> (S*B, ...)
     S, B = transitions.next_obs.shape[:2]
-    transitions = jax.tree_util.tree_map(
-        lambda x: jnp.reshape(x, (S * B, *x.shape[2:])), transitions
-    )
+    transitions = jax.tree_util.tree_map(lambda x: jnp.reshape(x, (S * B, *x.shape[2:])), transitions)
     total_num_steps = transitions.next_obs.shape[0]  # S*B
 
     chunk_size = total_num_steps // num_chunks
-    transitions_chunked = jax.tree_util.tree_map(
-        lambda x: x.reshape((num_chunks, chunk_size, *x.shape[1:])), transitions
-    )
+    transitions_chunked = jax.tree_util.tree_map(lambda x: x.reshape((num_chunks, chunk_size, *x.shape[1:])), transitions)
 
     def body_fun(carry, transitions_chunk):
-        targets_chunk = target_train_state.apply_fn(
-            target_train_state.params, transitions_chunk.next_obs
-        )
-        preds_chunk = predictor_train_state.apply_fn(
-            predictor_train_state.params, transitions_chunk.next_obs
-        )
+        targets_chunk = target_train_state.apply_fn(target_train_state.params, transitions_chunk.next_obs)
+        preds_chunk = predictor_train_state.apply_fn(predictor_train_state.params, transitions_chunk.next_obs)
         # Compute prediction errors
-        pred_errors_chunk = jnp.mean(
-            jnp.square(targets_chunk - preds_chunk), axis=-1
-        )  # (chunk_size,)
+        pred_errors_chunk = jnp.mean(jnp.square(targets_chunk - preds_chunk), axis=-1)  # (chunk_size,)
         return carry, pred_errors_chunk
 
     # Scan over chunks
@@ -353,9 +313,7 @@ def compute_rnd_intrinsic_rewards(
     )
 
     # (num_chunks, chunk_size) -> (S*B,) -> (S, B)
-    rnd_intrinsic_rewards = pred_errors_chunked.reshape((total_num_steps,)).reshape(
-        (S, B)
-    )
+    rnd_intrinsic_rewards = pred_errors_chunked.reshape((total_num_steps,)).reshape((S, B))
 
     return rnd_intrinsic_rewards
 
@@ -385,16 +343,10 @@ def normalize_rnd_intrinsic_rewards(runner_state, rnd_intrinsic_rewards, config)
         rewards=rnd_intrinsic_rewards,
         gamma=config.gamma_intrinsic,
     )  # (batch_size,) , (seq_len, batch_size)
-    normalization_stats = normalization_stats.replace(
-        running_forward_return=new_running_forward_return
-    )
-    normalization_stats = update_normalization_stats(
-        normalization_stats, returns.flatten()
-    )
+    normalization_stats = normalization_stats.replace(running_forward_return=new_running_forward_return)
+    normalization_stats = update_normalization_stats(normalization_stats, returns.flatten())
 
-    rnd_intrinsic_rewards = rnd_intrinsic_rewards / jnp.sqrt(
-        normalization_stats.var + 1e-8
-    )
+    rnd_intrinsic_rewards = rnd_intrinsic_rewards / jnp.sqrt(normalization_stats.var + 1e-8)
 
     runner_state = (
         rng,
@@ -426,20 +378,14 @@ def rnd_predictor_train(
     num_minibatches: int,
 ):
     # (S, B, ...) -> (S*B, ...)
-    transitions = jax.tree_util.tree_map(
-        lambda x: jnp.reshape(x, (-1, *x.shape[2:])), transitions
-    )
+    transitions = jax.tree_util.tree_map(lambda x: jnp.reshape(x, (-1, *x.shape[2:])), transitions)
     total_num_steps = transitions.next_obs.shape[0]  # S*B
 
     minibatch_size = total_num_steps // num_minibatches
 
     def loss_fn(predictor_params, transitions_chunk):
-        targets_chunk = target_train_state.apply_fn(
-            target_train_state.params, transitions_chunk.next_obs
-        )
-        preds_chunk = predictor_train_state.apply_fn(
-            predictor_params, transitions_chunk.next_obs
-        )
+        targets_chunk = target_train_state.apply_fn(target_train_state.params, transitions_chunk.next_obs)
+        preds_chunk = predictor_train_state.apply_fn(predictor_params, transitions_chunk.next_obs)
         # Compute mse loss
         loss = jnp.mean(jnp.square(targets_chunk - preds_chunk))
         return loss
@@ -450,9 +396,7 @@ def rnd_predictor_train(
         # Shuffle data
         rng, shuffle_rng = jax.random.split(rng)
         indices_permuted = jax.random.permutation(shuffle_rng, total_num_steps)
-        transitions_shuffled = jax.tree_util.tree_map(
-            lambda x: jnp.take(x, indices_permuted, axis=0), transitions
-        )
+        transitions_shuffled = jax.tree_util.tree_map(lambda x: jnp.take(x, indices_permuted, axis=0), transitions)
 
         # Reshape to (num_minibatches, minibatch_size, ...)
         transitions_shuffled = jax.tree_util.tree_map(
@@ -461,25 +405,19 @@ def rnd_predictor_train(
         )
 
         def minibatch_step(train_state, transitions_chunk):
-            loss, grads = jax.value_and_grad(loss_fn)(
-                train_state.params, transitions_chunk
-            )
+            loss, grads = jax.value_and_grad(loss_fn)(train_state.params, transitions_chunk)
             new_train_state = train_state.apply_gradients(grads=grads)
             return new_train_state, loss
 
         # loop over minibatches
-        train_state, batch_losses = jax.lax.scan(
-            minibatch_step, train_state, transitions_shuffled
-        )
+        train_state, batch_losses = jax.lax.scan(minibatch_step, train_state, transitions_shuffled)
         epoch_loss = jnp.mean(batch_losses)
 
         return (rng, train_state), epoch_loss
 
     # Main loop over epochs
     init_carry = (rng, predictor_train_state)
-    (rng, final_predictor_train_state), epoch_losses = jax.lax.scan(
-        epoch_body_fun, init_carry, None, num_epochs
-    )
+    (rng, final_predictor_train_state), epoch_losses = jax.lax.scan(epoch_body_fun, init_carry, None, num_epochs)
 
     loss_value = jnp.mean(epoch_losses)
 
