@@ -109,8 +109,21 @@ class TrainConfig:
     rnd: RNDConfig = field(default_factory=RNDConfig)
 
     # eval
+    eval_every_n_batches: int = 1
     eval_num_envs: int = 1024
     eval_num_episodes: int = 20
+    evaluation_alphas: tuple[tuple[float, ...], ...] | None = None
+    evaluation_alpha_labels: tuple[str, ...] = field(init=False)
+    evaluation_alphas_array: jnp.ndarray = field(init=False)
+
+    # logging
+    enable_wandb: bool = True
+    wandb_project: str = "open_end_proj"
+    wandb_run_name: str | None = None
+    wandb_tags: tuple[str, ...] = ()
+    wandb_group: str | None = None
+    wandb_entity: str | None = None
+    is_timing_run: bool = False
 
     SUPPORTED_ENV_IDS: ClassVar[tuple[str, ...]] = (
         "Craftax-Classic-Symbolic-v1",
@@ -124,7 +137,9 @@ class TrainConfig:
             raise ValueError(msg)
 
         if self.head_activation not in self.SUPPORTED_HEAD_ACTIVATIONS:
-            msg = f"head_activation must be one of {self.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.head_activation!r}."
+            msg = (
+                f"head_activation must be one of {self.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.head_activation!r}."
+            )
             raise ValueError(msg)
 
         self._validate_selected_intrinsic_modules()
@@ -138,6 +153,10 @@ class TrainConfig:
 
         self.num_batches_of_envs = math.ceil(self.total_timesteps / (self.num_envs_per_batch * self.num_steps_per_env))
         self.num_updates_per_batch = self.num_steps_per_env // self.num_steps_per_update
+        self._validate_eval_config()
+        self._validate_wandb_config()
+        self.evaluation_alphas_array = self._build_evaluation_alphas_array()
+        self.evaluation_alpha_labels = self._build_evaluation_alpha_labels()
 
     def _validate_selected_intrinsic_modules(self):
         from crew.main_algo.intrinsic_modules.registry import (
@@ -149,7 +168,9 @@ class TrainConfig:
             msg = "selected_intrinsic_modules cannot be empty for this algorithm."
             raise ValueError(msg)
         if len(self.selected_intrinsic_modules) != len(set(self.selected_intrinsic_modules)):
-            msg = f"selected_intrinsic_modules must not contain duplicates. Received {self.selected_intrinsic_modules!r}."
+            msg = (
+                f"selected_intrinsic_modules must not contain duplicates. Received {self.selected_intrinsic_modules!r}."
+            )
             raise ValueError(msg)
 
         for module_name in self.selected_intrinsic_modules:
@@ -161,7 +182,13 @@ class TrainConfig:
                 raise ValueError(msg)
 
     def _validate_training_layout(self):
-        if self.num_envs_per_batch <= 0 or self.num_steps_per_env <= 0 or self.num_steps_per_update <= 0 or self.num_minibatches <= 0 or self.subsequence_length_in_loss_calculation <= 0:
+        if (
+            self.num_envs_per_batch <= 0
+            or self.num_steps_per_env <= 0
+            or self.num_steps_per_update <= 0
+            or self.num_minibatches <= 0
+            or self.subsequence_length_in_loss_calculation <= 0
+        ):
             msg = "num_envs_per_batch, num_steps_per_env, num_steps_per_update, num_minibatches, and subsequence_length_in_loss_calculation must be > 0."
             raise ValueError(msg)
 
@@ -287,3 +314,99 @@ class TrainConfig:
                 msg = f"Unsupported intrinsic module {module_name!r} for gae_lambda construction."
                 raise ValueError(msg)
         return jnp.asarray(gae_lambda_values, dtype=jnp.float32)
+
+    def _validate_eval_config(self):
+        if self.eval_every_n_batches <= 0:
+            msg = f"eval_every_n_batches must be > 0. Received {self.eval_every_n_batches}."
+            raise ValueError(msg)
+        if self.eval_num_envs <= 0:
+            msg = f"eval_num_envs must be > 0. Received {self.eval_num_envs}."
+            raise ValueError(msg)
+        if self.eval_num_episodes <= 0:
+            msg = f"eval_num_episodes must be > 0. Received {self.eval_num_episodes}."
+            raise ValueError(msg)
+
+    def _validate_wandb_config(self):
+        if not self.wandb_project.strip():
+            msg = "wandb_project must be a non-empty string."
+            raise ValueError(msg)
+        if self.wandb_run_name is not None and not self.wandb_run_name.strip():
+            msg = "wandb_run_name must be non-empty when provided."
+            raise ValueError(msg)
+        if self.wandb_group is not None and not self.wandb_group.strip():
+            msg = "wandb_group must be non-empty when provided."
+            raise ValueError(msg)
+        if self.wandb_entity is not None and not self.wandb_entity.strip():
+            msg = "wandb_entity must be non-empty when provided."
+            raise ValueError(msg)
+        for tag in self.wandb_tags:
+            if not tag.strip():
+                msg = "wandb_tags cannot contain empty strings."
+                raise ValueError(msg)
+
+    def _build_evaluation_alphas_array(self) -> jnp.ndarray:
+        """Build fixed evaluation alpha matrix with shape [A, R]."""
+        if self.evaluation_alphas is None:
+            extrinsic_only_alpha = tuple(
+                1.0 if reward_fn_idx == 0 else 0.0 for reward_fn_idx in range(self.num_reward_functions)
+            )
+            raw_evaluation_alphas: tuple[tuple[float, ...], ...] = (extrinsic_only_alpha,)
+        else:
+            raw_evaluation_alphas = self.evaluation_alphas
+
+        evaluation_alphas_array = jnp.asarray(raw_evaluation_alphas, dtype=jnp.float32)
+        if evaluation_alphas_array.ndim != 2:
+            msg = (
+                "evaluation_alphas must be a 2D tuple-like object with shape [A, R]. "
+                f"Received shape {evaluation_alphas_array.shape}."
+            )
+            raise ValueError(msg)
+        if evaluation_alphas_array.shape[0] <= 0:
+            msg = "evaluation_alphas must contain at least one alpha vector."
+            raise ValueError(msg)
+        if evaluation_alphas_array.shape[1] != self.num_reward_functions:
+            msg = (
+                "Each evaluation alpha must have one coefficient per reward function. "
+                f"Expected second dimension {self.num_reward_functions}, received {evaluation_alphas_array.shape[1]}."
+            )
+            raise ValueError(msg)
+        if not bool(jnp.all(jnp.isfinite(evaluation_alphas_array))):
+            msg = "evaluation_alphas must be finite."
+            raise ValueError(msg)
+        if bool(jnp.any(evaluation_alphas_array < 0.0)):
+            msg = "evaluation_alphas must be non-negative."
+            raise ValueError(msg)
+
+        row_sums = jnp.sum(evaluation_alphas_array, axis=1)
+        if not bool(jnp.allclose(row_sums, jnp.ones_like(row_sums), atol=1e-6)):
+            msg = "Each evaluation alpha must sum to 1. " f"Received sums {row_sums}."
+            raise ValueError(msg)
+        return evaluation_alphas_array
+
+    def _build_evaluation_alpha_labels(self) -> tuple[str, ...]:
+        reward_label_prefixes = (
+            "ext",
+            *(
+                "".join(character for character in module_name.lower() if character.isalnum()) or f"r{module_idx + 1}"
+                for module_idx, module_name in enumerate(self.selected_intrinsic_modules)
+            ),
+        )
+        labels = []
+        for alpha in self.evaluation_alphas_array:
+            alpha_tokens = []
+            for reward_prefix, reward_weight in zip(reward_label_prefixes, alpha, strict=True):
+                decile_weight = int(round(float(reward_weight) * 10.0))
+                decile_weight = max(0, min(10, decile_weight))
+                alpha_tokens.append(f"{reward_prefix}{decile_weight:02d}")
+            labels.append("_".join(alpha_tokens))
+
+        unique_labels: list[str] = []
+        label_occurrences: dict[str, int] = {}
+        for label in labels:
+            occurrence_count = label_occurrences.get(label, 0)
+            label_occurrences[label] = occurrence_count + 1
+            if occurrence_count == 0:
+                unique_labels.append(label)
+            else:
+                unique_labels.append(f"{label}_{occurrence_count + 1}")
+        return tuple(unique_labels)

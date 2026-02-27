@@ -30,11 +30,7 @@ def calculate_gae(
 ) -> tuple[jax.Array, jax.Array]:
     def _get_advantages(gae_and_next_value, transition):
         gae, next_value = gae_and_next_value
-        delta = (
-            transition.reward
-            + gamma * next_value * (1 - transition.done)
-            - transition.value
-        )
+        delta = transition.reward + gamma * next_value * (1 - transition.done) - transition.value
         gae = delta + gamma * gae_lambda * (1 - transition.done) * gae
         return (gae, transition.value), gae
 
@@ -60,9 +56,7 @@ def update_epoch(update_state, unused_, config):
             # collect cached memories from the first step of every subsequence_length_in_loss_calculation sequence of steps
             memories_batch = batch_indices_select(
                 memories_batch,
-                transitions.memories_indices[
-                    :, :: config.subsequence_length_in_loss_calculation
-                ],
+                transitions.memories_indices[:, :: config.subsequence_length_in_loss_calculation],
             )
             memories_batch = batchify(memories_batch)
             # create the masks for processing each subsequence_length_in_loss_calculation sequence of steps
@@ -95,9 +89,7 @@ def update_epoch(update_state, unused_, config):
 
             # reshape to shapes (minibatch_size * (seq_len / subsequence_length_in_loss_calculation), subsequence_length_in_loss_calculation, ...)
             transitions, targets, advantages = jax.tree_util.tree_map(
-                lambda x: jnp.reshape(
-                    x, (-1, config.subsequence_length_in_loss_calculation, *x.shape[2:])
-                ),
+                lambda x: jnp.reshape(x, (-1, config.subsequence_length_in_loss_calculation, *x.shape[2:])),
                 (transitions, targets, advantages),
             )
 
@@ -112,34 +104,20 @@ def update_epoch(update_state, unused_, config):
             log_prob = pi.log_prob(transitions.action)
 
             # extrinsic value loss
-            extrinsic_value_pred_clipped = transitions.value + (
-                value - transitions.value
-            ).clip(-config.clip_eps, config.clip_eps)
+            extrinsic_value_pred_clipped = transitions.value + (value - transitions.value).clip(
+                -config.clip_eps, config.clip_eps
+            )
             extrinsic_value_losses = jnp.square(value - targets["extrinsic"])
-            extrinsic_value_losses_clipped = jnp.square(
-                extrinsic_value_pred_clipped - targets["extrinsic"]
-            )
-            extrinsic_value_loss = (
-                0.5
-                * jnp.maximum(
-                    extrinsic_value_losses, extrinsic_value_losses_clipped
-                ).mean()
-            )
+            extrinsic_value_losses_clipped = jnp.square(extrinsic_value_pred_clipped - targets["extrinsic"])
+            extrinsic_value_loss = 0.5 * jnp.maximum(extrinsic_value_losses, extrinsic_value_losses_clipped).mean()
 
             # intrinsic value loss
             intrinsic_value_pred_clipped = transitions.intrinsic_value + (
                 intrinsic_value - transitions.intrinsic_value
             ).clip(-config.clip_eps, config.clip_eps)
             intrinsic_value_losses = jnp.square(intrinsic_value - targets["intrinsic"])
-            intrinsic_value_losses_clipped = jnp.square(
-                intrinsic_value_pred_clipped - targets["intrinsic"]
-            )
-            intrinsic_value_loss = (
-                0.5
-                * jnp.maximum(
-                    intrinsic_value_losses, intrinsic_value_losses_clipped
-                ).mean()
-            )
+            intrinsic_value_losses_clipped = jnp.square(intrinsic_value_pred_clipped - targets["intrinsic"])
+            intrinsic_value_loss = 0.5 * jnp.maximum(intrinsic_value_losses, intrinsic_value_losses_clipped).mean()
 
             value_loss = extrinsic_value_loss + intrinsic_value_loss
 
@@ -160,9 +138,7 @@ def update_epoch(update_state, unused_, config):
             loss_actor = loss_actor.mean()
             entropy = pi.entropy().mean()
 
-            total_loss = (
-                loss_actor + config.vf_coef * value_loss - config.ent_coef * entropy
-            )
+            total_loss = loss_actor + config.vf_coef * value_loss - config.ent_coef * entropy
 
             # KL divergence
             approx_kl = jnp.mean((ratio - 1) - log_ratio)
@@ -198,9 +174,7 @@ def update_epoch(update_state, unused_, config):
         lambda x: jnp.swapaxes(x, 0, 1),
         batch,
     )
-    shuffled_batch = jax.tree_util.tree_map(
-        lambda x: jnp.take(x, permutation, axis=0), batch
-    )
+    shuffled_batch = jax.tree_util.tree_map(lambda x: jnp.take(x, permutation, axis=0), batch)
     minibatches = jax.tree_util.tree_map(
         lambda x: jnp.reshape(x, [config.num_minibatches, -1, *list(x.shape[1:])]),
         shuffled_batch,

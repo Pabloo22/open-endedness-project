@@ -6,9 +6,9 @@ import jax.tree_util as jtu
 from flax.training.train_state import TrainState
 from jax.tree_util import Partial
 
+from crew.evaluations.rollouts import eval_rollout
 from crew.RND.config import TrainConfig
 from crew.RND.data_collection_and_updates import collect_data_and_update
-from crew.evaluations.rollouts import eval_rollout
 from crew.RND.normalization_utils import NormalizationStats
 
 
@@ -44,13 +44,9 @@ def full_training_on_fixed_envs(
         ),
         dtype=jnp.bool_,
     )
-    memories_mask_idx = jnp.zeros((config.num_envs_per_batch,), dtype=jnp.int32) + (
-        config.past_context_length + 1
-    )
+    memories_mask_idx = jnp.zeros((config.num_envs_per_batch,), dtype=jnp.int32) + (config.past_context_length + 1)
 
-    normalization_stats = NormalizationStats(
-        running_forward_return=jnp.zeros(config.num_envs_per_batch)
-    )
+    normalization_stats = NormalizationStats(running_forward_return=jnp.zeros(config.num_envs_per_batch))
 
     runner_state = (
         rng,
@@ -76,9 +72,7 @@ def full_training_on_fixed_envs(
     ):
         # Train
         runner_state, metrics = jax.lax.scan(
-            Partial(
-                collect_data_and_update, env=env, env_params=env_params, config=config
-            ),
+            Partial(collect_data_and_update, env=env, env_params=env_params, config=config),
             runner_state,
             None,
             config.num_updates_per_batch,

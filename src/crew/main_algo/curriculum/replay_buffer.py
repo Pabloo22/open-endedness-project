@@ -36,10 +36,16 @@ def add_alpha_score_batch(
     - B must match alpha_score_replay_buffer.batch_size
     """
     capacity = alpha_score_replay_buffer.capacity
-    insert_indices = (alpha_score_replay_buffer.write_index + jnp.arange(alpha_score_replay_buffer.batch_size, dtype=jnp.int32)) % capacity
+    insert_indices = (
+        alpha_score_replay_buffer.write_index + jnp.arange(alpha_score_replay_buffer.batch_size, dtype=jnp.int32)
+    ) % capacity
 
-    next_alpha = alpha_score_replay_buffer.alpha.at[insert_indices].set(alpha_batch.astype(alpha_score_replay_buffer.alpha.dtype))
-    next_score = alpha_score_replay_buffer.score.at[insert_indices].set(score_batch.astype(alpha_score_replay_buffer.score.dtype))
+    next_alpha = alpha_score_replay_buffer.alpha.at[insert_indices].set(
+        alpha_batch.astype(alpha_score_replay_buffer.alpha.dtype)
+    )
+    next_score = alpha_score_replay_buffer.score.at[insert_indices].set(
+        score_batch.astype(alpha_score_replay_buffer.score.dtype)
+    )
     next_valid = alpha_score_replay_buffer.is_valid.at[insert_indices].set(is_valid_batch.astype(jnp.bool_))
 
     next_write_index = (alpha_score_replay_buffer.write_index + alpha_score_replay_buffer.batch_size) % capacity

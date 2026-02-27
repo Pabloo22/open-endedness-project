@@ -132,12 +132,8 @@ def normalize_rewards_and_update_normalization_stats(
         eps=config.reward_norm_eps,
         clip=config.reward_norm_clip,
     )
-    diagnostics = {
-        "preproc/reward_raw_mean": jnp.mean(rewards, axis=(0, 1)),  # [R]
-        "preproc/reward_norm_mean": jnp.mean(rewards_normalized, axis=(0, 1)),
-        "preproc/reward_norm_std": jnp.std(rewards_normalized, axis=(0, 1)),
-    }
-    return reward_normalization_stats, rewards_normalized, diagnostics
+    metrics: dict[str, jax.Array] = {}
+    return reward_normalization_stats, rewards_normalized, metrics
 
 
 def compute_value_targets_and_weighted_advantages(
@@ -175,12 +171,14 @@ def compute_value_targets_and_weighted_advantages(
         alpha_batch=alpha_batch,
         normalized_advantages=advantages_normalized,
     )
-    diagnostics = {
+    metrics = {
         "preproc/adv_raw_mean": jnp.mean(advantages_raw, axis=(0, 1)),
         "preproc/adv_norm_mean": jnp.mean(advantages_normalized, axis=(0, 1)),
         "preproc/adv_norm_std": jnp.std(advantages_normalized, axis=(0, 1)),
+        "preproc/weighted_adv_mean": jnp.mean(weighted_advantages),
+        "preproc/weighted_adv_std": jnp.std(weighted_advantages),
     }
-    return value_targets, weighted_advantages, diagnostics
+    return value_targets, weighted_advantages, metrics
 
 
 def step_envs(
@@ -311,7 +309,7 @@ def collect_data_and_update_agent(
         config=config,
     )
 
-    reward_normalization_stats, rewards_normalized, reward_diagnostics = normalize_rewards_and_update_normalization_stats(
+    reward_normalization_stats, rewards_normalized, reward_metrics = normalize_rewards_and_update_normalization_stats(
         rewards=rewards,
         reward_normalization_stats=runner_state.reward_normalization_stats,
         config=config,
@@ -333,7 +331,7 @@ def collect_data_and_update_agent(
         method=ActorCriticTransformer.model_forward_eval,
     )
 
-    value_targets, weighted_advantages, advantage_diagnostics = compute_value_targets_and_weighted_advantages(
+    value_targets, weighted_advantages, advantage_metrics = compute_value_targets_and_weighted_advantages(
         rewards_normalized=rewards_normalized,
         done=done,
         values=transitions.value,
@@ -342,9 +340,11 @@ def collect_data_and_update_agent(
         config=config,
     )
 
-    memories_batch = jnp.concatenate([jnp.swapaxes(memories_previous, 0, 1), memories_batch], axis=0)  # [past_context + num_steps_per_update, num_envs, num_tranformer_layers, hidden]
+    memories_batch = jnp.concatenate(
+        [jnp.swapaxes(memories_previous, 0, 1), memories_batch], axis=0
+    )  # [past_context + num_steps_per_update, num_envs, num_tranformer_layers, hidden]
 
-    rng, agent_train_state, ppo_diagnostics = update_agent(
+    rng, agent_train_state, ppo_metrics = update_agent(
         rng=rng,
         agent_train_state=runner_state.agent_train_state,
         transitions=transitions,
@@ -356,7 +356,7 @@ def collect_data_and_update_agent(
     )
 
     # prepare outputs
-    diagnostics = reward_diagnostics | advantage_diagnostics | ppo_diagnostics
+    metrics = reward_metrics | advantage_metrics | ppo_metrics
 
     intrinsic_modules_update_data = IntrinsicModulesUpdateData(
         obs=transitions.obs,
@@ -379,7 +379,7 @@ def collect_data_and_update_agent(
     return (
         updated_runner_state,
         (
-            diagnostics,
+            metrics,
             intrinsic_modules_update_data,
             lp_estimation_data,
         ),
