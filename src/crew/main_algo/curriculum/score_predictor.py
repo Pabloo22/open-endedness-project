@@ -35,7 +35,11 @@ class ScorePredictorMLP(nn.Module):
             kernel_init=orthogonal(np.sqrt(2)),
             bias_init=constant(0.0),
         )
-        self.linear_out = nn.Dense(1, kernel_init=nn.initializers.variance_scaling(1e-2, "fan_in", "truncated_normal"), bias_init=nn.initializers.zeros)
+        self.linear_out = nn.Dense(
+            1,
+            kernel_init=nn.initializers.variance_scaling(1e-2, "fan_in", "truncated_normal"),
+            bias_init=nn.initializers.zeros,
+        )
 
     def __call__(self, alpha: jax.Array) -> jax.Array:
         """Predict scalar scores for alpha inputs.
@@ -153,7 +157,7 @@ def train_score_predictor_on_buffer(
         config.curriculum.predictor_update_epochs,
     )
 
-    diagnostics = {
+    metrics = {
         "curriculum/predictor_loss": jnp.mean(epoch_losses),
     }
-    return rng, score_predictor_train_state, diagnostics
+    return rng, score_predictor_train_state, metrics

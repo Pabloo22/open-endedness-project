@@ -61,12 +61,8 @@ class Target_and_Predictor(nn.Module):
         else:
             self.activation_fn = nn.tanh
 
-        self.linear1 = nn.Dense(
-            self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )
-        self.linear2 = nn.Dense(
-            self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )
+        self.linear1 = nn.Dense(self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))
+        self.linear2 = nn.Dense(self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))
         self.linear_out = nn.Dense(
             self.output_embedding_dim,
             kernel_init=orthogonal(np.sqrt(2)),

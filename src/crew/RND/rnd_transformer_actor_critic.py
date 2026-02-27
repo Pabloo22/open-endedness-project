@@ -59,9 +59,7 @@ class ActorCriticTransformer(nn.Module):
     obs_emb_dim: int
 
     def setup(self):
-        self.input_encoder = CraftaxSymbolicObservationEncoder(
-            obs_emb_dim=self.obs_emb_dim
-        )
+        self.input_encoder = CraftaxSymbolicObservationEncoder(obs_emb_dim=self.obs_emb_dim)
 
         self.transformer = Transformer_XL(
             hidden_dim=self.hidden_dim,
@@ -77,15 +75,9 @@ class ActorCriticTransformer(nn.Module):
         else:
             self.activation_fn = nn.tanh
 
-        self.actor_linear1 = nn.Dense(
-            self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )
-        self.actor_linear2 = nn.Dense(
-            self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
-        )
-        self.actor_out = nn.Dense(
-            self.num_actions, kernel_init=orthogonal(0.01), bias_init=constant(0.0)
-        )
+        self.actor_linear1 = nn.Dense(self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))
+        self.actor_linear2 = nn.Dense(self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0))
+        self.actor_out = nn.Dense(self.num_actions, kernel_init=orthogonal(0.01), bias_init=constant(0.0))
 
         self.critic_extrinsic_linear1 = nn.Dense(
             self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -93,9 +85,7 @@ class ActorCriticTransformer(nn.Module):
         self.critic_extrinsic_linear2 = nn.Dense(
             self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )
-        self.critic_extrinsic_out = nn.Dense(
-            1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
-        )
+        self.critic_extrinsic_out = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))
 
         self.critic_intrinsic_linear1 = nn.Dense(
             self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
@@ -103,9 +93,7 @@ class ActorCriticTransformer(nn.Module):
         self.critic_intrinsic_linear2 = nn.Dense(
             self.mlp_dim, kernel_init=orthogonal(np.sqrt(2)), bias_init=constant(0.0)
         )
-        self.critic_intrinsic_out = nn.Dense(
-            1, kernel_init=orthogonal(1.0), bias_init=constant(0.0)
-        )
+        self.critic_intrinsic_out = nn.Dense(1, kernel_init=orthogonal(1.0), bias_init=constant(0.0))
 
     def _encode_eval_input(self, input: jax.Array) -> jax.Array:
         # input: [batch_size, 1, obs_dim] -> [batch_size, obs_emb_dim]
@@ -114,8 +102,7 @@ class ActorCriticTransformer(nn.Module):
             raise ValueError(msg)
         if input.shape[1] != 1:
             msg = (
-                "Evaluation input must have sequence length 1 for memory-cached stepping. "
-                f"Got shape {input.shape}."
+                "Evaluation input must have sequence length 1 for memory-cached stepping. " f"Got shape {input.shape}."
             )
             raise ValueError(msg)
         encoded_input = self.input_encoder(input)
@@ -157,9 +144,7 @@ class ActorCriticTransformer(nn.Module):
         )
 
     def model_forward_eval(self, memories, input, mask):
-        x, memory_out = self.transformer.forward_eval(
-            memories, self._encode_eval_input(input), mask
-        )
+        x, memory_out = self.transformer.forward_eval(memories, self._encode_eval_input(input), mask)
 
         actor = self.actor_linear1(x)
         actor = self.activation_fn(actor)
@@ -188,9 +173,7 @@ class ActorCriticTransformer(nn.Module):
         )
 
     def model_forward_train(self, memories, input, mask):
-        x = self.transformer.forward_train(
-            memories, self._encode_train_input(input), mask
-        )
+        x = self.transformer.forward_train(memories, self._encode_train_input(input), mask)
 
         actor = self.actor_linear1(x)
         actor = self.activation_fn(actor)

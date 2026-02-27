@@ -82,10 +82,16 @@ def update_epoch(update_state, _unused, config):
             log_prob = pi.log_prob(transitions.action)
 
             # Critic loss over all reward-function heads.
-            values_pred_clipped = transitions.value + (predicted_values - transitions.value).clip(-config.clip_eps, config.clip_eps)
+            values_pred_clipped = transitions.value + (predicted_values - transitions.value).clip(
+                -config.clip_eps, config.clip_eps
+            )
             value_losses = jnp.square(predicted_values - targets)
             value_losses_clipped = jnp.square(values_pred_clipped - targets)
-            value_loss = 0.5 * jnp.maximum(value_losses, value_losses_clipped).mean()
+            value_loss_per_reward_function = 0.5 * jnp.mean(
+                jnp.maximum(value_losses, value_losses_clipped),
+                axis=(0, 1),
+            )  # [R]
+            value_loss_total = jnp.mean(value_loss_per_reward_function)
 
             # Actor loss from precomputed alpha-weighted advantages.
             log_ratio = log_prob - transitions.log_prob
@@ -102,14 +108,14 @@ def update_epoch(update_state, _unused, config):
             actor_loss = -jnp.minimum(actor_loss_unclipped, actor_loss_clipped).mean()
 
             entropy = pi.entropy().mean()
-            total_loss = actor_loss + config.vf_coef * value_loss - config.ent_coef * entropy
+            total_loss = actor_loss + config.vf_coef * value_loss_total - config.ent_coef * entropy
             approx_kl = jnp.mean((ratio - 1.0) - log_ratio)
-            return total_loss, (value_loss, actor_loss, entropy, approx_kl)
+            return total_loss, (value_loss_per_reward_function, actor_loss, entropy, approx_kl)
 
         transitions, memories_batch, alpha_batch, advantages, targets = batch_info
 
         grad_fn = jax.value_and_grad(loss_fn, has_aux=True)
-        (total_loss, (value_loss, actor_loss, entropy, approx_kl)), grads = grad_fn(
+        (total_loss, (value_loss_per_reward_function, actor_loss, entropy, approx_kl)), grads = grad_fn(
             train_state.params,
             transitions,
             memories_batch,
@@ -120,7 +126,7 @@ def update_epoch(update_state, _unused, config):
         train_state = train_state.apply_gradients(grads=grads)
         metrics = {
             "ppo/total_loss": total_loss,
-            "ppo/value_loss": value_loss,
+            "ppo/value_loss": value_loss_per_reward_function,
             "ppo/actor_loss": actor_loss,
             "ppo/entropy": entropy,
             "ppo/approx_kl": approx_kl,

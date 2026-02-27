@@ -242,7 +242,7 @@ class RNDIntrinsicModule:
         )
         updated_module_state = module_state.replace(predictor_train_state=updated_predictor_state)
         metrics: IntrinsicUpdateMetrics = {
-            "rnd/predictor_loss": mean_predictor_loss,
+            "intrinsic_modules/rnd/predictor_loss": mean_predictor_loss,
         }
         return updated_module_state, metrics
 

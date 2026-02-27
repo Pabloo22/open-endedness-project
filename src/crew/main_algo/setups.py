@@ -14,7 +14,11 @@ from crew.main_algo.curriculum.score_predictor import init_score_predictor_train
 from crew.main_algo.intrinsic_modules.api import IntrinsicModule
 from crew.main_algo.intrinsic_modules.registry import get_selected_intrinsic_modules
 from crew.main_algo.reward_normalization import init_reward_normalization_stats
-from crew.main_algo.types import CurriculumState, IntrinsicStates, RewardNormalizationStats
+from crew.main_algo.types import (
+    CurriculumState,
+    IntrinsicStates,
+    RewardNormalizationStats,
+)
 from crew.shared_code.wrappers import AutoResetEnvWrapper
 
 
@@ -194,4 +198,13 @@ def set_up_for_training(
         rng=rng,
         config=config,
     )
-    return rng, env, env_params, agent_train_state, reward_normalization_stats, intrinsic_modules, intrinsic_states, curriculum_state
+    return (
+        rng,
+        env,
+        env_params,
+        agent_train_state,
+        reward_normalization_stats,
+        intrinsic_modules,
+        intrinsic_states,
+        curriculum_state,
+    )

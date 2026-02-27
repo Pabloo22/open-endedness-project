@@ -8,7 +8,7 @@ from flax.training.train_state import TrainState
 # Protocol-facing state alias. Each intrinsic module owns its concrete state pytree.
 IntrinsicModuleState: TypeAlias = Any
 
-# Standard diagnostics mapping returned by intrinsic module updates.
+# Standard metrics mapping returned by intrinsic module updates.
 IntrinsicUpdateMetrics: TypeAlias = dict[str, jax.Array]
 
 # Per-run intrinsic states aligned with the statically selected module tuple.

@@ -41,11 +41,15 @@ def compute_forward_returns(
         new_running_returns = rewards_t + gamma[None, :] * running_returns
         return new_running_returns, new_running_returns
 
-    new_running_forward_return, forward_returns = jax.lax.scan(scan_step, running_forward_return, rewards, reverse=False)
+    new_running_forward_return, forward_returns = jax.lax.scan(
+        scan_step, running_forward_return, rewards, reverse=False
+    )
     return new_running_forward_return, forward_returns
 
 
-def update_reward_normalization_stats(old_stats: RewardNormalizationStats, forward_returns: jax.Array) -> RewardNormalizationStats:
+def update_reward_normalization_stats(
+    old_stats: RewardNormalizationStats, forward_returns: jax.Array
+) -> RewardNormalizationStats:
     """Update running mean/variance of forward returns (for each reward function) using Chan's batch version of Welford's algorithm.
 
     Key input shapes:

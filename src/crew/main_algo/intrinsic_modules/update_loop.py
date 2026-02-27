@@ -18,15 +18,15 @@ def update_intrinsic_modules(
 ) -> tuple[jax.Array, IntrinsicStates, dict[str, jax.Array]]:
     """Update each intrinsic module once using data from the fixed-alpha window."""
     updated_states = []
-    diagnostics: dict[str, jax.Array] = {}
+    metrics: dict[str, jax.Array] = {}
     for module, module_state in zip(intrinsic_modules, intrinsic_states, strict=True):
         rng, module_rng = jax.random.split(rng)
-        updated_module_state, module_diagnostics = module.update(
+        updated_module_state, module_metrics = module.update(
             rng=module_rng,
             module_state=module_state,
             transitions=intrinsic_modules_update_data,
             config=config,
         )
         updated_states.append(updated_module_state)
-        diagnostics = diagnostics | module_diagnostics
-    return rng, tuple(updated_states), diagnostics
+        metrics = metrics | module_metrics
+    return rng, tuple(updated_states), metrics

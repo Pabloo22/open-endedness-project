@@ -216,4 +216,7 @@ ruff.toml
 artifacts/
 PLAN.md
 algorithm_design.md
+evaluation_plan.md
+saved_and_logged_metrics.md
+wandb/
 ##--##
