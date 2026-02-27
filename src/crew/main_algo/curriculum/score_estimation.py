@@ -15,7 +15,7 @@ def compute_scores(
     - lp_per_reward_function: [B, R]
     - returns:
       - scores: [B]
-      - diagnostics scalars
+      - metrics scalars
     """
     if score_lp_mode == "alp":
         lp_used = jnp.abs(lp_per_reward_function)
@@ -31,12 +31,7 @@ def compute_scores(
     lambda_t = jnp.asarray(score_lambda, dtype=lp_total.dtype)
     scores = lambda_t * lp_total + (jnp.array(1.0, dtype=lp_total.dtype) - lambda_t) * extrinsic_lp
 
-    diagnostics = {
-        "score/mean": jnp.mean(scores),
-        "score/std": jnp.std(scores),
-        "score/min": jnp.min(scores),
-        "score/max": jnp.max(scores),
-        "score/lp_total_mean": jnp.mean(lp_total),
-        "score/extrinsic_lp_mean": jnp.mean(extrinsic_lp),
+    metrics = {
+        "curriculum/score_mean": jnp.mean(scores),
     }
-    return scores, diagnostics
+    return scores, metrics

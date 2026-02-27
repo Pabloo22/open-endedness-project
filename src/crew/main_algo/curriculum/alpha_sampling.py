@@ -20,13 +20,10 @@ def uniform_sampling(
         alpha=jnp.ones((num_reward_functions,), dtype=jnp.float32),
         shape=(num_envs_per_batch,),
     )
-    diagnostics = {
-        "curriculum/sampler_used_predictor": jnp.array(0.0, dtype=jnp.float32),
-        "curriculum/sampler_candidate_pool_size": jnp.array(0.0, dtype=jnp.float32),
-        "curriculum/sampler_pred_score_mean": jnp.array(0.0, dtype=jnp.float32),
-        "curriculum/sampler_pred_score_std": jnp.array(0.0, dtype=jnp.float32),
+    metrics = {
+        "curriculum/pred_score_mean": jnp.array(0.0, dtype=jnp.float32),
     }
-    return rng, alpha_batch, diagnostics
+    return rng, alpha_batch, metrics
 
 
 def predictor_based_importance_sampling(
@@ -51,7 +48,9 @@ def predictor_based_importance_sampling(
         curriculum_state.score_predictor_train_state.params,
         alpha_candidates,
     )  # [C]
-    sampling_weights = jnp.clip(predicted_scores, min=0.0) + jnp.array(config.curriculum.sampling_weights_eps, dtype=predicted_scores.dtype)  # [C]
+    sampling_weights = jnp.clip(predicted_scores, min=0.0) + jnp.array(
+        config.curriculum.sampling_weights_eps, dtype=predicted_scores.dtype
+    )  # [C]
     sampling_probabilities = sampling_weights / jnp.sum(sampling_weights)  # [C]
 
     sampled_candidate_indices = jax.random.choice(
@@ -63,13 +62,10 @@ def predictor_based_importance_sampling(
     )  # [B]
     alpha_batch = jnp.take(alpha_candidates, sampled_candidate_indices, axis=0)  # [B, R]
 
-    diagnostics = {
-        "curriculum/sampler_used_predictor": jnp.array(1.0, dtype=jnp.float32),
-        "curriculum/sampler_candidate_pool_size": jnp.asarray(num_candidates, dtype=jnp.float32),
-        "curriculum/sampler_pred_score_mean": jnp.mean(predicted_scores),
-        "curriculum/sampler_pred_score_std": jnp.std(predicted_scores),
+    metrics = {
+        "curriculum/pred_score_mean": jnp.mean(predicted_scores),
     }
-    return rng, alpha_batch, diagnostics
+    return rng, alpha_batch, metrics
 
 
 def sample_alpha_batch(

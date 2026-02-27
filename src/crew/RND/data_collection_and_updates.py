@@ -75,9 +75,13 @@ def step_envs(runner_state, unused, env, env_params, config):
     # step_rngs: [num_envs], prev_obs/next_obs: [num_envs, obs_dim], done/reward: [num_envs]
     rng, step_rng_base = jax.random.split(rng)
     step_rngs = jax.random.split(step_rng_base, num=config.num_envs_per_batch)
-    next_obs, env_state, reward, done, _ = jax.vmap(env.step, in_axes=(0, 0, 0, None))(step_rngs, env_state, action, env_params)
+    next_obs, env_state, reward, done, _ = jax.vmap(env.step, in_axes=(0, 0, 0, None))(
+        step_rngs, env_state, action, env_params
+    )
 
-    memory_indices = jnp.arange(0, config.past_context_length)[None, :] + current_update_step_num * jnp.ones((config.num_envs_per_batch, 1), dtype=jnp.int32)
+    memory_indices = jnp.arange(0, config.past_context_length)[None, :] + current_update_step_num * jnp.ones(
+        (config.num_envs_per_batch, 1), dtype=jnp.int32
+    )
 
     # Store transition data
     transition = Transition_data_rnd(
@@ -92,7 +96,9 @@ def step_envs(runner_state, unused, env, env_params, config):
         next_obs=next_obs,
         intrinsic_reward=jnp.zeros_like(reward),
         intrinsic_value=value_intrinsic,
-        done_for_intrinsic=jnp.zeros_like(done),  # set always to false because we optimize rnd intrinsic rewards across episodes
+        done_for_intrinsic=jnp.zeros_like(
+            done
+        ),  # set always to false because we optimize rnd intrinsic rewards across episodes
     )
 
     # create updated runner state
@@ -168,7 +174,9 @@ def update_agent(runner_state, transitions, memories_batch, config):
         config.gae_lambda_intrinsic,
     )
 
-    advantages = config.extrinsic_coef * advantages_ext + config.intrinsic_coef * advantages_int  # (num_steps, num_envs)
+    advantages = (
+        config.extrinsic_coef * advantages_ext + config.intrinsic_coef * advantages_int
+    )  # (num_steps, num_envs)
     targets = {
         "extrinsic": targets_ext,
         "intrinsic": targets_int,
@@ -243,13 +251,15 @@ def update_rnd_predictor(runner_state, transitions, config):
     return runner_state, predictor_loss_value
 
 
-#############-------------------------------
+#############------------------------------
 
 
 def collect_data_and_update(runner_state, _unused, env, env_params, config):
     memories_previous = runner_state[8]  # (batch_size, past_context_length, num_tranformer_layers, hidden_dim)
 
-    runner_state, transitions, memories_batch = collect_data(runner_state, config.num_steps_per_update, env, env_params, config)
+    runner_state, transitions, memories_batch = collect_data(
+        runner_state, config.num_steps_per_update, env, env_params, config
+    )
 
     # compute raw rnd intrinsic rewards
     rnd_intrinsic_rewards = compute_rnd_intrinsic_rewards(
@@ -260,11 +270,15 @@ def collect_data_and_update(runner_state, _unused, env, env_params, config):
     )  # (seq_len, batch_size)
 
     # normalize intrinsic rewards and update the transitions pytree
-    runner_state, normalized_rnd_intrinsic_rewards = normalize_rnd_intrinsic_rewards(runner_state, rnd_intrinsic_rewards, config)
+    runner_state, normalized_rnd_intrinsic_rewards = normalize_rnd_intrinsic_rewards(
+        runner_state, rnd_intrinsic_rewards, config
+    )
     transitions = transitions.replace(intrinsic_reward=normalized_rnd_intrinsic_rewards)
 
     # Concatenate previous memory with new batch
-    memories_batch = jnp.concatenate([jnp.swapaxes(memories_previous, 0, 1), memories_batch], axis=0)  # (past_context + num_steps_per_update, num_envs, num_tranformer_layers, hidden_dim)
+    memories_batch = jnp.concatenate(
+        [jnp.swapaxes(memories_previous, 0, 1), memories_batch], axis=0
+    )  # (past_context + num_steps_per_update, num_envs, num_tranformer_layers, hidden_dim)
 
     # update policy and value networks
     runner_state, metrics = update_agent(runner_state, transitions, memories_batch, config)
@@ -296,7 +310,9 @@ def compute_rnd_intrinsic_rewards(
     total_num_steps = transitions.next_obs.shape[0]  # S*B
 
     chunk_size = total_num_steps // num_chunks
-    transitions_chunked = jax.tree_util.tree_map(lambda x: x.reshape((num_chunks, chunk_size, *x.shape[1:])), transitions)
+    transitions_chunked = jax.tree_util.tree_map(
+        lambda x: x.reshape((num_chunks, chunk_size, *x.shape[1:])), transitions
+    )
 
     def body_fun(carry, transitions_chunk):
         targets_chunk = target_train_state.apply_fn(target_train_state.params, transitions_chunk.next_obs)

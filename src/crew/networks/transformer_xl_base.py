@@ -26,19 +26,13 @@ class Gating(nn.Module):
 
     @nn.compact
     def __call__(self, x, y):
-        r = jax.nn.sigmoid(
-            nn.Dense(self.d_input, use_bias=False)(y)
-            + nn.Dense(self.d_input, use_bias=False)(x)
-        )
+        r = jax.nn.sigmoid(nn.Dense(self.d_input, use_bias=False)(y) + nn.Dense(self.d_input, use_bias=False)(x))
         z = jax.nn.sigmoid(
             nn.Dense(self.d_input, use_bias=False)(y)
             + nn.Dense(self.d_input, use_bias=False)(x)
             - self.param("gating_bias", constant(self.bg), (self.d_input,))
         )
-        h = jnp.tanh(
-            nn.Dense(self.d_input, use_bias=False)(y)
-            + nn.Dense(self.d_input, use_bias=False)(r * x)
-        )
+        h = jnp.tanh(nn.Dense(self.d_input, use_bias=False)(y) + nn.Dense(self.d_input, use_bias=False)(r * x))
         g = (1 - z) * x + (z * h)
         return g
 
@@ -77,9 +71,7 @@ class transformer_layer(nn.Module):
     ):
         values_keys = self.ln1(values_keys)
         queries_n = self.ln1(queries)
-        attention = self.attention1(
-            inputs_kv=values_keys, inputs_q=queries_n, mask=mask, pos_embed=pos_embed
-        )
+        attention = self.attention1(inputs_kv=values_keys, inputs_q=queries_n, mask=mask, pos_embed=pos_embed)
         if self.gating:
             out_attention = self.gate1(queries, jax.nn.relu(attention))
         else:
@@ -101,15 +93,11 @@ class PositionalEmbedding(nn.Module):
     dim_emb: int
 
     def setup(self):
-        self.inv_freq = 1 / (
-            10000 ** (jnp.arange(0.0, self.dim_emb, 2.0) / self.dim_emb)
-        )
+        self.inv_freq = 1 / (10000 ** (jnp.arange(0.0, self.dim_emb, 2.0) / self.dim_emb))
 
     def __call__(self, pos_seq, bsz=None):
         sinusoid_inp = jnp.outer(pos_seq, self.inv_freq)
-        pos_emb = jnp.concatenate(
-            [jnp.sin(sinusoid_inp), jnp.cos(sinusoid_inp)], axis=-1
-        )
+        pos_emb = jnp.concatenate([jnp.sin(sinusoid_inp), jnp.cos(sinusoid_inp)], axis=-1)
 
         return pos_emb
 
@@ -140,9 +128,7 @@ class Transformer_XL(nn.Module):
 
     def __call__(self, memories, input: jnp.ndarray, mask: jnp.ndarray):
         encoded = self.encoder(input)
-        pos_embed = self.pos_emb(jnp.arange(1 + memories.shape[-3], -1, -1))[
-            : 1 + memories.shape[-3]
-        ]
+        pos_embed = self.pos_emb(jnp.arange(1 + memories.shape[-3], -1, -1))[: 1 + memories.shape[-3]]
 
         x = encoded
 
@@ -156,9 +142,7 @@ class Transformer_XL(nn.Module):
                 axis=-2,
             )
 
-            x = layer(
-                values_keys=memory, pos_embed=pos_embed, queries=x[:, None], mask=mask
-            )
+            x = layer(values_keys=memory, pos_embed=pos_embed, queries=x[:, None], mask=mask)
             x = x.squeeze(axis=1)
 
             i = i + 1
@@ -167,9 +151,7 @@ class Transformer_XL(nn.Module):
 
     def forward_eval(self, memories, input: jnp.ndarray, mask: jnp.ndarray):
         encoded = self.encoder(input)
-        pos_embed = self.pos_emb(jnp.arange(1 + memories.shape[-3], -1, -1))[
-            : 1 + memories.shape[-3]
-        ]
+        pos_embed = self.pos_emb(jnp.arange(1 + memories.shape[-3], -1, -1))[: 1 + memories.shape[-3]]
 
         out_memory = jnp.zeros((encoded.shape[0], self.num_layers, *encoded.shape[1:]))
         x = encoded
@@ -180,9 +162,7 @@ class Transformer_XL(nn.Module):
 
             memory = jnp.concatenate([memories[:, :, i], x[:, None]], axis=-2)
 
-            x = layer(
-                values_keys=memory, pos_embed=pos_embed, queries=x[:, None], mask=mask
-            )
+            x = layer(values_keys=memory, pos_embed=pos_embed, queries=x[:, None], mask=mask)
             x = x.squeeze(axis=1)
             i = i + 1
 
@@ -193,9 +173,9 @@ class Transformer_XL(nn.Module):
 
         encoded = self.encoder(input)
 
-        pos_embed = self.pos_emb(
-            jnp.arange(encoded.shape[-2] + memories.shape[-3], -1, -1)
-        )[: encoded.shape[-2] + memories.shape[-3]]
+        pos_embed = self.pos_emb(jnp.arange(encoded.shape[-2] + memories.shape[-3], -1, -1))[
+            : encoded.shape[-2] + memories.shape[-3]
+        ]
 
         x = encoded
         i = 0

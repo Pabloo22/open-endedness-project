@@ -8,7 +8,6 @@ import flax
 import jax
 import orbax.checkpoint as orbax
 from flax.training import orbax_utils
-from jax.tree_util import Partial
 
 from crew.experiments.paths import build_trained_weights_path
 from crew.main_algo.config import TrainConfig
@@ -32,21 +31,17 @@ def run_main_algo_training(config: TrainConfig, save_results: bool = True) -> di
     print(f"Training main algorithm with seed {config.train_seed}")
     start_time = time.time()
 
-    full_training_partial = Partial(
-        full_training,
-        env=env,
-        env_params=env_params,
-        intrinsic_modules=intrinsic_modules,
-        config=config,
-    )
-    jitted_full_training = jax.jit(full_training_partial)
     train_info = jax.block_until_ready(
-        jitted_full_training(
+        full_training(
             rng=rng,
             agent_train_state=agent_train_state,
             reward_normalization_stats=reward_normalization_stats,
             intrinsic_states=intrinsic_states,
             curriculum_state=curriculum_state,
+            env=env,
+            env_params=env_params,
+            intrinsic_modules=intrinsic_modules,
+            config=config,
         )
     )
 
@@ -87,7 +82,7 @@ if __name__ == "__main__":
     # Smoke-friendly local run configuration.
     config = TrainConfig(
         train_seed=1,
-        total_timesteps=50_000,
+        total_timesteps=100_000,
         env_id="Craftax-Classic-Symbolic-v1",
         num_envs_per_batch=64,
         num_steps_per_env=512,

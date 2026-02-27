@@ -43,7 +43,7 @@ class IntrinsicModule(Protocol):
         transitions: IntrinsicModulesUpdateData,
         config: Any,
     ) -> tuple[IntrinsicModuleState, IntrinsicUpdateMetrics]:
-        """Update module state and return diagnostics metrics."""
+        """Update module state and return metrics."""
 
     def done_mask(self, env_done: jax.Array, config: Any) -> jax.Array:
         """Compute the done mask."""

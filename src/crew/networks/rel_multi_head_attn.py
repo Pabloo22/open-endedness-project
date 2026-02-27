@@ -82,17 +82,11 @@ def dot_product_attention_weights(
 
     depth = query.shape[-1]
 
-    attn_weights = jnp.einsum(
-        "...qhd,...khd->...hqk", query + r_w_bias, key, precision=precision
-    )
+    attn_weights = jnp.einsum("...qhd,...khd->...hqk", query + r_w_bias, key, precision=precision)
 
-    attn_weights_r = jnp.einsum(
-        "...qhd,khd->...hqk", query + r_r_bias, r_pos_embed, precision=precision
-    )
+    attn_weights_r = jnp.einsum("...qhd,khd->...hqk", query + r_r_bias, r_pos_embed, precision=precision)
 
-    attn_weights_r = roll_vmap(
-        attn_weights_r, jnp.arange(0, query.shape[-3]) - (query.shape[-3] - 1), -1
-    )
+    attn_weights_r = roll_vmap(attn_weights_r, jnp.arange(0, query.shape[-3]) - (query.shape[-3] - 1), -1)
     attn_weights = attn_weights + attn_weights_r
 
     attn_weights = attn_weights / jnp.sqrt(depth).astype(dtype)
@@ -138,12 +132,8 @@ def dot_product_attention(
     query, key, value = promote_dtype(query, key, value, dtype=dtype)
     dtype = query.dtype
     assert key.ndim == query.ndim == value.ndim, "q, k, v must have same rank."
-    assert (
-        query.shape[:-3] == key.shape[:-3] == value.shape[:-3]
-    ), "q, k, v batch dims must match."
-    assert (
-        query.shape[-2] == key.shape[-2] == value.shape[-2]
-    ), "q, k, v num_heads must match."
+    assert query.shape[:-3] == key.shape[:-3] == value.shape[:-3], "q, k, v batch dims must match."
+    assert query.shape[-2] == key.shape[-2] == value.shape[-2], "q, k, v num_heads must match."
     assert key.shape[-3] == value.shape[-3], "k, v lengths must match."
 
     # compute attention weights
@@ -249,15 +239,9 @@ class RelMultiHeadDotProductAttention(Module):
 
         if self.decode:
             is_initialized = self.has_variable("cache", "cached_key")
-            cached_key = self.variable(
-                "cache", "cached_key", jnp.zeros, key.shape, key.dtype
-            )
-            cached_value = self.variable(
-                "cache", "cached_value", jnp.zeros, value.shape, value.dtype
-            )
-            cache_index = self.variable(
-                "cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32)
-            )
+            cached_key = self.variable("cache", "cached_key", jnp.zeros, key.shape, key.dtype)
+            cached_value = self.variable("cache", "cached_value", jnp.zeros, value.shape, value.dtype)
+            cache_index = self.variable("cache", "cache_index", lambda: jnp.array(0, dtype=jnp.int32))
             if is_initialized:
                 (
                     *batch_dims,
@@ -290,9 +274,7 @@ class RelMultiHeadDotProductAttention(Module):
 
         dropout_rng = None
         if self.dropout_rate > 0.0:
-            m_deterministic = merge_param(
-                "deterministic", self.deterministic, deterministic
-            )
+            m_deterministic = merge_param("deterministic", self.deterministic, deterministic)
             if not m_deterministic:
                 dropout_rng = self.make_rng("dropout")
         else:

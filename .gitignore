@@ -213,8 +213,11 @@ AGENTS.md
 notes.txt
 implementation_details_and_instructions/
 ruff.toml
-tests/
+#tests/
 artifacts/
 PLAN.md
 algorithm_design.md
+evaluation_plan.md
+saved_and_logged_metrics.md
+wandb/
 ##--##

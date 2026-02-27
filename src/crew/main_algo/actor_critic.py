@@ -177,7 +177,9 @@ class ActorCriticTransformer(nn.Module):
         encoded_obs = self.input_encoder(observations=observations)  # [B, T, obs_emb]
 
         if self.inject_alpha_at_trunk or self.inject_alpha_at_actor_head or self.inject_alpha_at_critic_head:
-            alpha_over_time = jnp.broadcast_to(alpha_batch[:, None, :], (alpha_batch.shape[0], encoded_obs.shape[1], alpha_batch.shape[1]))  # [B, T, R]
+            alpha_over_time = jnp.broadcast_to(
+                alpha_batch[:, None, :], (alpha_batch.shape[0], encoded_obs.shape[1], alpha_batch.shape[1])
+            )  # [B, T, R]
 
         if self.inject_alpha_at_trunk:
             transformer_input = jnp.concatenate((encoded_obs, alpha_over_time), axis=-1)  # [B, T, obs_emb + R]

@@ -111,7 +111,9 @@ def _estimate_episodic_lp_for_stream(
         # Fraction of the episode executed under each update index.
         total_episode_steps = jnp.sum(updated_steps_per_update)
         total_episode_steps = jnp.maximum(total_episode_steps, jnp.array(1, dtype=jnp.int32))
-        fractions_per_update = updated_steps_per_update.astype(rewards_ut.dtype) / total_episode_steps.astype(rewards_ut.dtype)
+        fractions_per_update = updated_steps_per_update.astype(rewards_ut.dtype) / total_episode_steps.astype(
+            rewards_ut.dtype
+        )
         # Effective policy index for this episode (fractional for cross-update episodes).
         episode_x = jnp.sum(fractions_per_update * update_indices_float)
 
