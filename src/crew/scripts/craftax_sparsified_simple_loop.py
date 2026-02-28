@@ -11,6 +11,7 @@ import jax.numpy as jnp
 from flax import struct
 from jax.tree_util import Partial
 
+from craftax.craftax.constants import ACHIEVEMENT_REWARD_MAP, Achievement
 from craftax.craftax.envs.craftax_symbolic_env import CraftaxSymbolicEnv
 from crew.main_algo.intrinsic_modules.api import IntrinsicModule
 from crew.main_algo.types import IntrinsicModulesUpdateData, TransitionDataBase
@@ -40,17 +41,37 @@ class SparseIntrinsicCraftaxWrapper:
             ``alpha[1:]`` scale each intrinsic module in order.
             Defaults to ``[1.0]`` when *modules* is empty, or equal weights
             ``1 / (n + 1)`` for each component when *n* modules are provided.
+        blocked_achievement_ids: Optional list of ``Achievement`` integer values
+            whose reward contribution is removed before accumulation.  All other
+            reward signal (health reward, non-blocked achievements) is unchanged.
+            Defaults to ``None`` (no achievements blocked).
     """
 
     def __init__(
         self,
-        env,
+        env: CraftaxSymbolicEnv,
         modules: list[IntrinsicModule] | None = None,
         alpha: list[float] | None = None,
+        blocked_achievement_ids: list[int] | None = None,
     ):
         self._env = env
         self._modules: list[IntrinsicModule] = modules if modules is not None else []
         n = len(self._modules)
+
+        num_achievements = len(Achievement)
+        blocked_ids = (
+            blocked_achievement_ids if blocked_achievement_ids is not None else []
+        )
+        blocked_mask = jnp.zeros(num_achievements, dtype=jnp.bool_)
+        if blocked_ids:
+            blocked_mask = blocked_mask.at[jnp.array(blocked_ids, dtype=jnp.int32)].set(
+                True
+            )
+        self._blocked_mask: jnp.ndarray = blocked_mask
+        # Pre-compute the reward that each blocked achievement would contribute.
+        self._blocked_reward_map: jnp.ndarray = (
+            jnp.array(ACHIEVEMENT_REWARD_MAP, dtype=jnp.float32) * blocked_mask
+        )
 
         if alpha is None:
             if n == 0:
@@ -102,6 +123,11 @@ class SparseIntrinsicCraftaxWrapper:
             key, state.env_state, action, params
         )
 
+        # Reconstruct correct achievements and remove blocked reward.
+        post_step_achievements = self._get_post_step_achievements(info, next_env_state)
+        newly_unlocked = post_step_achievements & ~state.env_state.achievements
+        dense_reward = self._adjust_dense_reward(dense_reward, newly_unlocked)
+
         new_episode_return = state.episode_return + dense_reward
 
         # Sparsify: output total accumulated reward ONLY when the episode ends.
@@ -118,35 +144,10 @@ class SparseIntrinsicCraftaxWrapper:
             log_prob=jnp.zeros((), dtype=jnp.float32),  # unused by most modules
         )
 
-        total_reward = self._alpha[0] * sparse_extrinsic
-        new_intrinsic_states: list[Any] = []
-
-        for i, (module, module_state) in enumerate(
-            zip(self._modules, state.intrinsic_states)
-        ):
-            key, rng = jax.random.split(key)
-            raw_intrinsic = module.compute_rewards(
-                rng, module_state, transition, config=None
-            )
-            # Zero out intrinsic reward at episode boundaries.
-            intrinsic_reward = jax.lax.select(
-                done, jnp.float32(0.0), raw_intrinsic.astype(jnp.float32)
-            )
-            total_reward = total_reward + self._alpha[i + 1] * intrinsic_reward
-            info[f"intrinsic_reward_{module.name}"] = intrinsic_reward
-            key, rng_update = jax.random.split(key)
-            new_module_state, _ = module.update(
-                rng_update,
-                module_state,
-                IntrinsicModulesUpdateData(
-                    obs=transition.obs,
-                    next_obs=transition.next_obs,
-                    action=transition.action,
-                    done=transition.done,
-                ),
-                config=None,
-            )
-            new_intrinsic_states.append(new_module_state)
+        key, total_intrinsic, new_intrinsic_states = self._apply_all_intrinsic_modules(
+            key, state.intrinsic_states, transition, done, info
+        )
+        total_reward = self._alpha[0] * sparse_extrinsic + total_intrinsic
 
         # Reset accumulated return at episode boundaries.
         next_episode_return = jax.lax.select(done, jnp.float32(0.0), new_episode_return)
@@ -162,6 +163,103 @@ class SparseIntrinsicCraftaxWrapper:
         info["sparse_extrinsic_reward"] = sparse_extrinsic
 
         return next_obs, next_wrapper_state, total_reward, done, info
+
+    def _get_post_step_achievements(self, info, next_env_state) -> jnp.ndarray:
+        """Reconstruct post-step achievements before auto-reset clobbers them.
+
+        ``AutoResetEnvWrapper`` zeroes ``env_state.achievements`` on episode
+        end, but ``log_achievements_to_info`` preserves them in
+        ``info["Achievements/..."] * 100``.  Taking the OR of both sources
+        gives the correct achievements regardless of whether the episode just
+        ended.
+        """
+        info_achievements = (
+            jnp.stack(
+                [
+                    info[f"Achievements/{achievement.name.lower()}"]
+                    for achievement in Achievement
+                ]
+            )
+            / 100.0
+        ).astype(jnp.bool_)
+        return info_achievements | next_env_state.achievements
+
+    def _adjust_dense_reward(
+        self, dense_reward: jnp.ndarray, newly_unlocked: jnp.ndarray
+    ) -> jnp.ndarray:
+        """Subtract the reward contribution of blocked achievements."""
+        blocked_reward_this_step = (
+            newly_unlocked.astype(jnp.float32) * self._blocked_reward_map
+        ).sum()
+        return dense_reward - blocked_reward_this_step
+
+    def _apply_intrinsic_module(
+        self,
+        key: jnp.ndarray,
+        module: IntrinsicModule,
+        module_state: Any,
+        transition: TransitionDataBase,
+        done: jnp.ndarray,
+    ) -> tuple[jnp.ndarray, jnp.ndarray, Any]:
+        """Run a single intrinsic module: compute reward then update its state.
+
+        Returns:
+            key: Updated PRNG key.
+            intrinsic_reward: Scalar reward (zeroed at episode boundaries).
+            new_module_state: Updated module state after the online update.
+        """
+        key, rng_compute = jax.random.split(key)
+        raw_intrinsic = module.compute_rewards(
+            rng_compute, module_state, transition, config=None
+        )
+        # Zero out intrinsic reward at episode boundaries.
+        intrinsic_reward = jax.lax.select(
+            done, jnp.float32(0.0), raw_intrinsic.astype(jnp.float32)
+        )
+
+        key, rng_update = jax.random.split(key)
+        new_module_state, _ = module.update(
+            rng_update,
+            module_state,
+            IntrinsicModulesUpdateData(
+                obs=transition.obs,
+                next_obs=transition.next_obs,
+                action=transition.action,
+                done=transition.done,
+            ),
+            config=None,
+        )
+        return key, intrinsic_reward, new_module_state
+
+    def _apply_all_intrinsic_modules(
+        self,
+        key: jnp.ndarray,
+        intrinsic_states: tuple,
+        transition: TransitionDataBase,
+        done: jnp.ndarray,
+        info: dict,
+    ) -> tuple[jnp.ndarray, jnp.ndarray, list[Any]]:
+        """Apply every intrinsic module and return the weighted reward sum.
+
+        Returns:
+            key: Updated PRNG key.
+            total_intrinsic: Weighted sum of all intrinsic rewards (scalar).
+            new_intrinsic_states: List of updated module states.
+        """
+        total_intrinsic = jnp.float32(0.0)
+        new_intrinsic_states: list[Any] = []
+
+        for i, (module, module_state) in enumerate(
+            zip(self._modules, intrinsic_states)
+        ):
+            key, intrinsic_reward, new_module_state = self._apply_intrinsic_module(
+                key, module, module_state, transition, done
+            )
+            total_intrinsic = total_intrinsic + self._alpha[i + 1] * intrinsic_reward
+            info[f"intrinsic_reward_{module.name}"] = intrinsic_reward
+            new_intrinsic_states.append(new_module_state)
+
+        return key, total_intrinsic, new_intrinsic_states
 
 
 # --- 2. Configuration ---
@@ -184,7 +282,9 @@ class Config:
 # --- 3. JAX Scanning / Vmapping ---
 
 
-def step_envs_random(runner_state, _, env, env_params, config):
+def step_envs_random(
+    runner_state, _, env: CraftaxSymbolicEnv, env_params, config: Config
+):
     rng, state = runner_state
     rng, step_rng, action_rng = jax.random.split(rng, 3)
     step_rngs = jax.random.split(step_rng, config.num_parallel_envs)
@@ -195,7 +295,7 @@ def step_envs_random(runner_state, _, env, env_params, config):
     )
 
     # vmap seamlessly handles SparseWrapperState because it's a registered PyTree
-    obs, next_state, reward, done, info = jax.vmap(env.step, in_axes=(0, 0, 0, None))(
+    _, next_state, *_ = jax.vmap(env.step, in_axes=(0, 0, 0, None))(
         step_rngs, state, actions, env_params
     )
 
