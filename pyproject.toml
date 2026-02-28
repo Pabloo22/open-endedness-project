@@ -43,6 +43,9 @@ disable = [
   "missing-class-docstring",
   "missing-function-docstring",
   "attribute-defined-outside-init",
+  "line-too-long",
+  "too-few-public-methods",
+  "protected-access",
 ]
 
 [build-system]
