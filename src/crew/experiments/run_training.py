@@ -80,7 +80,7 @@ def run_main_algo_training(config: TrainConfig, save_results: bool = True) -> di
 
 if __name__ == "__main__":
     # Smoke-friendly local run configuration.
-    config = TrainConfig(
+    config_ = TrainConfig(
         train_seed=1,
         total_timesteps=100_000,
         env_id="Craftax-Classic-Symbolic-v1",
@@ -96,4 +96,4 @@ if __name__ == "__main__":
         qkv_features=64,
         head_hidden_dim=64,
     )
-    run_main_algo_training(config=config, save_results=False)
+    run_main_algo_training(config=config_, save_results=False)

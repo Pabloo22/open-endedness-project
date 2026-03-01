@@ -29,6 +29,7 @@ from crew.main_algo.types import (
     RewardNormalizationStats,
     RunnerStateTransformer,
 )
+from crew.main_algo.config import TrainConfig
 
 
 def train_one_iteration(
@@ -40,7 +41,7 @@ def train_one_iteration(
     env: Any,
     env_params: Any,
     intrinsic_modules: tuple[IntrinsicModule, ...],
-    config: Any,
+    config: TrainConfig,
 ) -> tuple[jax.Array, TrainState, RewardNormalizationStats, IntrinsicStates, CurriculumState, dict[str, jax.Array]]:
     """Run one outer iteration: alpha sampling, inner updates, then intrinsic updates."""
     rng, alpha_batch, alpha_sampling_metrics = sample_alpha_batch(
@@ -215,7 +216,7 @@ def full_training(
     env: Any,
     env_params: Any,
     intrinsic_modules: tuple[IntrinsicModule, ...],
-    config: Any,
+    config: TrainConfig,
 ) -> dict[str, Any]:
     """Main training loop with fixed-alpha windows and intrinsic updates."""
     achievement_names = infer_achievement_names(env=env, env_params=env_params)
