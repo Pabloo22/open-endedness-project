@@ -85,6 +85,7 @@ if __name__ == "__main__":
         total_timesteps=100_000,
         env_id="Craftax-Classic-Symbolic-v1",
         achievement_ids_to_block=tuple(range(15)),  # Block the first n achievements for testing.
+        remove_health_reward=True,  # removes -0.1 penalty for damage and  0.1 reward for
         num_envs_per_batch=64,
         num_steps_per_env=512,
         num_steps_per_update=256,
