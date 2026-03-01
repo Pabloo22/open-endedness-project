@@ -7,9 +7,11 @@ from functools import partial
 import jax
 import jax.numpy as jnp
 from craftax.craftax import constants as craftax_constants
+from craftax.craftax.envs.craftax_symbolic_env import EnvState
 from craftax.craftax_classic.envs.craftax_symbolic_env import (
     CraftaxClassicSymbolicEnv,
     CraftaxClassicSymbolicEnvNoAutoReset,
+    EnvState as ClassicEnvState,
 )
 from craftax.craftax_classic import constants as classic_craftax_constants
 
@@ -141,7 +143,12 @@ class SparseCraftaxWrapper(GymnaxWrapper):
             The original dense reward is stored in ``info["real_reward"]``.
     """
 
-    def __init__(self, env, blocked_achievement_ids: Sequence[int] | None = None):
+    def __init__(
+        self,
+        env,
+        blocked_achievement_ids: Sequence[int] | None = None,
+        remove_health_reward: bool = False,
+    ):
         super().__init__(env)
 
         if isinstance(env, (CraftaxClassicSymbolicEnv, CraftaxClassicSymbolicEnvNoAutoReset)):
@@ -159,14 +166,16 @@ class SparseCraftaxWrapper(GymnaxWrapper):
         self._blocked_reward_map: jnp.ndarray = (
             jnp.array(achievement_reward_map, dtype=jnp.float32) * self._blocked_mask
         )
+        self.remove_health_rewards = remove_health_reward
 
     @partial(jax.jit, static_argnums=(0, 4))
-    def step(self, rng, state, action, params=None):
+    def step(self, rng, state: EnvState | ClassicEnvState, action, params=None):
         obs, next_state, reward, done, info = self._env.step(rng, state, action, params)
-
         newly_unlocked = next_state.achievements & ~state.achievements
         blocked_reward = (newly_unlocked.astype(jnp.float32) * self._blocked_reward_map).sum()
         info["real_reward"] = reward
         adjusted_reward = reward - blocked_reward
-
+        if self.remove_health_rewards:
+            init_health = state.player_health
+            adjusted_reward -= (next_state.player_health - init_health) * 0.1
         return obs, next_state, adjusted_reward, done, info

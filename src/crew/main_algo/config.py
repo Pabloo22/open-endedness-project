@@ -49,7 +49,8 @@ class CurriculumConfig:
 class TrainConfig:
     train_seed: int = 42
     env_id: str = "Craftax-Classic-Symbolic-v1"
-    achievement_ids_to_block: Sequence[int, ...] = ()
+    achievement_ids_to_block: Sequence[int] = ()
+    remove_health_reward: bool = False
     episode_max_steps: int | None = 1000
     training_mode: str = "curriculum"
 

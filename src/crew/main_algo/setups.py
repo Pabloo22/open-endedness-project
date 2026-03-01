@@ -155,7 +155,11 @@ def set_up_for_training(
     env_params = base_env.default_params
     if config.episode_max_steps is not None:
         env_params = env_params.replace(max_timesteps=config.episode_max_steps)
-    base_env = SparseCraftaxWrapper(base_env, blocked_achievement_ids=config.achievement_ids_to_block)
+    base_env = SparseCraftaxWrapper(
+        base_env,
+        blocked_achievement_ids=config.achievement_ids_to_block,
+        remove_health_reward=config.remove_health_reward,
+    )
     env = AutoResetEnvWrapper(base_env)
 
     # Agent setup.
