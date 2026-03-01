@@ -2,13 +2,13 @@ import unittest
 
 import jax
 
-from crew.main_algo.config import CurriculumConfig, RNDConfig, TrainConfig
-from crew.main_algo.main_loop import full_training
+from crew.main_algo.baseline_main_loop import full_training_baseline
+from crew.main_algo.config import TrainConfig
 from crew.main_algo.setups import set_up_for_training
 
 
-class TestMainAlgoMetricsContract(unittest.TestCase):
-    def test_full_training_metrics_keys_match_contract(self):
+class TestMainAlgoBaselineMetricsContract(unittest.TestCase):
+    def test_full_training_baseline_metrics_keys_match_contract(self):
         expected_training_keys = {
             "preproc/adv_raw_mean",
             "preproc/adv_norm_mean",
@@ -20,17 +20,6 @@ class TestMainAlgoMetricsContract(unittest.TestCase):
             "ppo/actor_loss",
             "ppo/entropy",
             "ppo/approx_kl",
-            "intrinsic_modules/rnd/predictor_loss",
-            "curriculum/pred_score_mean",
-            "curriculum/predictor_loss",
-            "curriculum/alpha/mean_per_reward_function",
-            "curriculum/alpha/std_per_reward_function",
-            "curriculum/alpha/entropy_mean",
-            "curriculum/lp_per_reward_function",
-            "curriculum/score_mean",
-            "curriculum/valid_fraction_of_scores_in_batch",
-            "curriculum/completed_episodes_per_env_mean",
-            "curriculum/alpha/extrinsic_weight_per_env",
         }
         expected_final_keys = {
             *expected_training_keys,
@@ -48,6 +37,8 @@ class TestMainAlgoMetricsContract(unittest.TestCase):
         }
 
         config = TrainConfig(
+            training_mode="baseline",
+            selected_intrinsic_modules=(),
             train_seed=0,
             total_timesteps=16,
             env_id="Craftax-Classic-Symbolic-v1",
@@ -68,21 +59,6 @@ class TestMainAlgoMetricsContract(unittest.TestCase):
             eval_num_envs=2,
             eval_num_episodes=1,
             enable_wandb=False,
-            curriculum=CurriculumConfig(
-                replay_buffer_num_batches=2,
-                predictor_num_minibatches=2,
-                predictor_update_epochs=1,
-                predictor_hidden_dim=16,
-                importance_num_candidates_multiplier=2,
-                min_batches_for_predictor_sampling=1,
-            ),
-            rnd=RNDConfig(
-                predictor_num_minibatches=4,
-                num_chunks_in_rewards_computation=4,
-                predictor_update_epochs=1,
-                head_hidden_dim=32,
-                output_embedding_dim=32,
-            ),
         )
         (
             rng,
@@ -92,15 +68,14 @@ class TestMainAlgoMetricsContract(unittest.TestCase):
             reward_normalization_stats,
             intrinsic_modules,
             intrinsic_states,
-            curriculum_state,
+            _curriculum_state,
         ) = set_up_for_training(config)
         out = jax.block_until_ready(
-            full_training(
+            full_training_baseline(
                 rng=rng,
                 agent_train_state=agent_train_state,
                 reward_normalization_stats=reward_normalization_stats,
                 intrinsic_states=intrinsic_states,
-                curriculum_state=curriculum_state,
                 env=env,
                 env_params=env_params,
                 intrinsic_modules=intrinsic_modules,
