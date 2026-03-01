@@ -87,11 +87,21 @@ def update_epoch(update_state, _unused, config):
             )
             value_losses = jnp.square(predicted_values - targets)
             value_losses_clipped = jnp.square(values_pred_clipped - targets)
-            value_loss_per_reward_function = 0.5 * jnp.mean(
-                jnp.maximum(value_losses, value_losses_clipped),
-                axis=(0, 1),
-            )  # [R]
-            value_loss_total = jnp.mean(value_loss_per_reward_function)
+            max_value_loss = jnp.maximum(value_losses, value_losses_clipped)  # [B_mb, T, R]
+
+            if config.use_weighted_value_loss:
+                # Branch: Weighted value loss. Each reward function's contribution to the total
+                # loss is proportional to its weight (alpha) in the current environment.
+                # Since alphas sum to 1, this maintains the overall loss scale.
+                weighted_max_value_loss = max_value_loss * alpha_batch[:, None, :]
+                value_loss_total = 0.5 * jnp.mean(jnp.sum(weighted_max_value_loss, axis=-1))
+            else:
+                # Branch: Unweighted value loss. All reward functions contribute equally to
+                # the total loss, regardless of their current importance to the policy.
+                value_loss_total = 0.5 * jnp.mean(max_value_loss)
+
+            # For logging, track the mean loss per reward function across the minibatch.
+            value_loss_per_reward_function = 0.5 * jnp.mean(max_value_loss, axis=(0, 1))  # [R]
 
             # Actor loss from precomputed alpha-weighted advantages.
             log_ratio = log_prob - transitions.log_prob

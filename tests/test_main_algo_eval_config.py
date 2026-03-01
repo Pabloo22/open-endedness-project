@@ -122,6 +122,66 @@ class TestMainAlgoEvalConfig(unittest.TestCase):
                 evaluation_alpha_labels=("ext_only", "mix"),
             )
 
+    def test_baseline_mode_allows_empty_intrinsic_modules_and_defaults_to_extrinsic_only_alpha(self):
+        config = TrainConfig(
+            **_base_config_kwargs(),
+            training_mode="baseline",
+            selected_intrinsic_modules=(),
+        )
+        self.assertEqual(config.num_reward_functions, 1)
+        self.assertEqual(config.baseline_fixed_training_alpha, (1.0,))
+        np.testing.assert_allclose(
+            np.asarray(config.evaluation_alphas_array),
+            np.asarray([[1.0]], dtype=np.float32),
+            rtol=0,
+            atol=1e-6,
+        )
+        self.assertFalse(config.inject_alpha_at_trunk)
+        self.assertFalse(config.inject_alpha_at_actor_head)
+        self.assertFalse(config.inject_alpha_at_critic_head)
+
+    def test_baseline_mode_uses_fixed_training_alpha_for_eval_and_ignores_evaluation_alphas(self):
+        config = TrainConfig(
+            **_base_config_kwargs(),
+            training_mode="baseline",
+            selected_intrinsic_modules=("rnd",),
+            baseline_fixed_training_alpha=(0.6, 0.4),
+            evaluation_alphas=((1.0, 0.0),),
+        )
+        self.assertEqual(config.baseline_fixed_training_alpha, (0.6, 0.4))
+        np.testing.assert_allclose(
+            np.asarray(config.evaluation_alphas_array),
+            np.asarray([[0.6, 0.4]], dtype=np.float32),
+            rtol=0,
+            atol=1e-6,
+        )
+        self.assertEqual(config.evaluation_alpha_labels, ("ext06_rnd04",))
+
+    def test_invalid_baseline_fixed_training_alpha_raises(self):
+        with self.assertRaises(ValueError):
+            TrainConfig(
+                **_base_config_kwargs(),
+                training_mode="baseline",
+                selected_intrinsic_modules=("rnd",),
+                baseline_fixed_training_alpha=(0.7,),
+            )
+
+        with self.assertRaises(ValueError):
+            TrainConfig(
+                **_base_config_kwargs(),
+                training_mode="baseline",
+                selected_intrinsic_modules=("rnd",),
+                baseline_fixed_training_alpha=(0.7, 0.7),
+            )
+
+        with self.assertRaises(ValueError):
+            TrainConfig(
+                **_base_config_kwargs(),
+                training_mode="baseline",
+                selected_intrinsic_modules=("rnd",),
+                baseline_fixed_training_alpha=(-0.1, 1.1),
+            )
+
 
 if __name__ == "__main__":
     unittest.main()
