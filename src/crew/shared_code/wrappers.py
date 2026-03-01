@@ -147,7 +147,7 @@ class SparseCraftaxWrapper(GymnaxWrapper):
         self,
         env,
         blocked_achievement_ids: Sequence[int] | None = None,
-        remove_health_rewards: bool = False,
+        remove_health_reward: bool = False,
     ):
         super().__init__(env)
 
@@ -166,7 +166,7 @@ class SparseCraftaxWrapper(GymnaxWrapper):
         self._blocked_reward_map: jnp.ndarray = (
             jnp.array(achievement_reward_map, dtype=jnp.float32) * self._blocked_mask
         )
-        self.remove_health_rewards = remove_health_rewards
+        self.remove_health_rewards = remove_health_reward
 
     @partial(jax.jit, static_argnums=(0, 4))
     def step(self, rng, state: EnvState | ClassicEnvState, action, params=None):

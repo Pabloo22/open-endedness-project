@@ -158,7 +158,7 @@ def set_up_for_training(
     base_env = SparseCraftaxWrapper(
         base_env,
         blocked_achievement_ids=config.achievement_ids_to_block,
-        remove_health_rewards=config.remove_health_reward,
+        remove_health_reward=config.remove_health_reward,
     )
     env = AutoResetEnvWrapper(base_env)
 
