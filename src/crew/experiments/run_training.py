@@ -80,10 +80,11 @@ def run_main_algo_training(config: TrainConfig, save_results: bool = True) -> di
 
 if __name__ == "__main__":
     # Smoke-friendly local run configuration.
-    config = TrainConfig(
+    config_ = TrainConfig(
         train_seed=1,
         total_timesteps=100_000,
         env_id="Craftax-Classic-Symbolic-v1",
+        achievement_ids_to_block=tuple(range(15)),  # Block the first n achievements for testing.
         num_envs_per_batch=64,
         num_steps_per_env=512,
         num_steps_per_update=256,
@@ -96,4 +97,4 @@ if __name__ == "__main__":
         qkv_features=64,
         head_hidden_dim=64,
     )
-    run_main_algo_training(config=config, save_results=False)
+    run_main_algo_training(config=config_, save_results=False)

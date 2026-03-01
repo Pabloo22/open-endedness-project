@@ -1,5 +1,6 @@
 """Configuration objects for the main algorithm training stack."""
 
+from collections.abc import Sequence
 import math
 from dataclasses import dataclass, field
 from pathlib import Path
@@ -48,6 +49,7 @@ class CurriculumConfig:
 class TrainConfig:
     train_seed: int = 42
     env_id: str = "Craftax-Classic-Symbolic-v1"
+    achievement_ids_to_block: Sequence[int, ...] = ()
     episode_max_steps: int | None = 1000
 
     # training

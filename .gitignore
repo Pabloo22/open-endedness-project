@@ -213,7 +213,6 @@ AGENTS.md
 notes.txt
 implementation_details_and_instructions/
 ruff.toml
-#tests/
 artifacts/
 PLAN.md
 algorithm_design.md
