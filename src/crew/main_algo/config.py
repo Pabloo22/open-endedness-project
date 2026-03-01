@@ -52,6 +52,7 @@ class TrainConfig:
     achievement_ids_to_block: Sequence[int] = ()
     remove_health_reward: bool = False
     episode_max_steps: int | None = 1000
+    training_mode: str = "curriculum"
 
     # training
     num_envs_per_batch: int = 2048
@@ -101,9 +102,11 @@ class TrainConfig:
     inject_alpha_at_trunk: bool = True
     inject_alpha_at_actor_head: bool = True
     inject_alpha_at_critic_head: bool = True
+    use_weighted_value_loss: bool = True
 
     # module selection and module-specific nested config
     selected_intrinsic_modules: tuple[str, ...] = ("rnd",)
+    baseline_fixed_training_alpha: tuple[float, ...] | None = None
     num_reward_functions: int = field(init=False)
     is_episodic_per_reward_function: jnp.ndarray = field(init=False)
     gamma_per_reward_function: jnp.ndarray = field(init=False)
@@ -114,7 +117,7 @@ class TrainConfig:
     # eval
     eval_every_n_batches: int = 1
     eval_num_envs: int = 1024
-    eval_num_episodes: int = 20
+    eval_num_episodes: int = 2
     evaluation_alphas: tuple[tuple[float, ...], ...] | None = None
     evaluation_alpha_labels: tuple[str, ...] = field(init=False)
     evaluation_alphas_array: jnp.ndarray = field(init=False)
@@ -133,8 +136,13 @@ class TrainConfig:
         "Craftax-Symbolic-v1",
     )
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+    SUPPORTED_TRAINING_MODES: ClassVar[tuple[str, ...]] = ("curriculum", "baseline")
 
     def __post_init__(self):
+        if self.training_mode not in self.SUPPORTED_TRAINING_MODES:
+            msg = f"training_mode must be one of {self.SUPPORTED_TRAINING_MODES}. " f"Received {self.training_mode!r}."
+            raise ValueError(msg)
+
         if self.env_id not in self.SUPPORTED_ENV_IDS:
             msg = f"env_id must be one of {self.SUPPORTED_ENV_IDS}. Received env_id={self.env_id!r}."
             raise ValueError(msg)
@@ -148,14 +156,17 @@ class TrainConfig:
         self._validate_selected_intrinsic_modules()
         self._validate_training_layout()
         self._validate_selected_module_configs()
-        self._validate_curriculum_config()
         self.num_reward_functions = 1 + len(self.selected_intrinsic_modules)
+        self._apply_mode_specific_overrides()
+        self.baseline_fixed_training_alpha = self._resolve_baseline_fixed_training_alpha()
         self.is_episodic_per_reward_function = self._build_is_episodic_per_reward_function()
         self.gamma_per_reward_function = self._build_gamma_per_reward_function()
         self.gae_lambda_per_reward_function = self._build_gae_lambda_per_reward_function()
 
         self.num_batches_of_envs = math.ceil(self.total_timesteps / (self.num_envs_per_batch * self.num_steps_per_env))
         self.num_updates_per_batch = self.num_steps_per_env // self.num_steps_per_update
+        if self.training_mode == "curriculum":
+            self._validate_curriculum_config()
         self._validate_eval_config()
         self._validate_wandb_config()
         self.evaluation_alphas_array = self._build_evaluation_alphas_array()
@@ -167,7 +178,7 @@ class TrainConfig:
         )
 
         registered_names = get_registered_intrinsic_module_names()
-        if not self.selected_intrinsic_modules:
+        if self.training_mode == "curriculum" and not self.selected_intrinsic_modules:
             msg = "selected_intrinsic_modules cannot be empty for this algorithm."
             raise ValueError(msg)
         if len(self.selected_intrinsic_modules) != len(set(self.selected_intrinsic_modules)):
@@ -238,6 +249,45 @@ class TrainConfig:
                     f"({self.rnd.num_chunks_in_rewards_computation})."
                 )
                 raise ValueError(msg)
+
+    def _apply_mode_specific_overrides(self):
+        if self.training_mode == "baseline":
+            # Baseline policy/value are not alpha-conditioned.
+            self.inject_alpha_at_trunk = False
+            self.inject_alpha_at_actor_head = False
+            self.inject_alpha_at_critic_head = False
+
+    def _resolve_baseline_fixed_training_alpha(self) -> tuple[float, ...] | None:
+        if self.training_mode != "baseline":
+            return self.baseline_fixed_training_alpha
+
+        if self.baseline_fixed_training_alpha is None:
+            return tuple(1.0 if reward_fn_idx == 0 else 0.0 for reward_fn_idx in range(self.num_reward_functions))
+
+        baseline_alpha = jnp.asarray(self.baseline_fixed_training_alpha, dtype=jnp.float32)
+        if baseline_alpha.ndim != 1:
+            msg = (
+                "baseline_fixed_training_alpha must be a 1D tuple-like object with shape [R]. "
+                f"Received shape {baseline_alpha.shape}."
+            )
+            raise ValueError(msg)
+        if baseline_alpha.shape[0] != self.num_reward_functions:
+            msg = (
+                "baseline_fixed_training_alpha must have one coefficient per reward function. "
+                f"Expected length {self.num_reward_functions}, received {baseline_alpha.shape[0]}."
+            )
+            raise ValueError(msg)
+        if not bool(jnp.all(jnp.isfinite(baseline_alpha))):
+            msg = "baseline_fixed_training_alpha must be finite."
+            raise ValueError(msg)
+        if bool(jnp.any(baseline_alpha < 0.0)):
+            msg = "baseline_fixed_training_alpha must be non-negative."
+            raise ValueError(msg)
+        alpha_sum = jnp.sum(baseline_alpha)
+        if not bool(jnp.allclose(alpha_sum, jnp.array(1.0, dtype=baseline_alpha.dtype), atol=1e-6)):
+            msg = "baseline_fixed_training_alpha must sum to 1. " f"Received sum {float(alpha_sum)}."
+            raise ValueError(msg)
+        return tuple(self.baseline_fixed_training_alpha)
 
     def _validate_curriculum_config(self):
         if self.curriculum.score_lp_mode not in CurriculumConfig.SUPPORTED_SCORE_LP_MODES:
@@ -349,7 +399,12 @@ class TrainConfig:
 
     def _build_evaluation_alphas_array(self) -> jnp.ndarray:
         """Build fixed evaluation alpha matrix with shape [A, R]."""
-        if self.evaluation_alphas is None:
+        if self.training_mode == "baseline":
+            if self.baseline_fixed_training_alpha is None:  # pragma: no cover - __post_init__ sets this in baseline.
+                msg = "baseline_fixed_training_alpha must be set in baseline mode."
+                raise ValueError(msg)
+            raw_evaluation_alphas: tuple[tuple[float, ...], ...] = (self.baseline_fixed_training_alpha,)
+        elif self.evaluation_alphas is None:
             extrinsic_only_alpha = tuple(
                 1.0 if reward_fn_idx == 0 else 0.0 for reward_fn_idx in range(self.num_reward_functions)
             )

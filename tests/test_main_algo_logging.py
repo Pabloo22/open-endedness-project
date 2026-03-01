@@ -34,6 +34,7 @@ class _FakeWandb:
 class TestMainAlgoLogging(unittest.TestCase):
     def test_build_wandb_run_name_includes_intrinsic_modules(self):
         config = SimpleNamespace(
+            training_mode="curriculum",
             env_id="Craftax-Classic-Symbolic-v1",
             train_seed=7,
             wandb_run_name=None,
@@ -41,7 +42,7 @@ class TestMainAlgoLogging(unittest.TestCase):
         )
         self.assertEqual(
             build_wandb_run_name(config),
-            "main_algo|Craftax-Classic-Symbolic-v1|seed7|intr:rnd+foo",
+            "curriculum|intr:rnd+foo|Craftax-Classic-Symbolic-v1|seed7",
         )
 
     def test_build_training_batch_log_payload_splits_reward_vector_metrics(self):
@@ -117,6 +118,7 @@ class TestMainAlgoLogging(unittest.TestCase):
     def test_log_outer_batch_to_wandb_logs_once_with_step_and_histogram(self):
         fake_wandb = _FakeWandb()
         config = SimpleNamespace(
+            training_mode="curriculum",
             selected_intrinsic_modules=("rnd",),
             evaluation_alpha_labels=("ext10_rnd00",),
         )
@@ -174,6 +176,73 @@ class TestMainAlgoLogging(unittest.TestCase):
             _FakeWandb.Histogram,
         )
         self.assertIn("eval/ext10_rnd00/return_mean", call["payload"])
+
+    def test_baseline_eval_payload_does_not_use_alpha_label_names(self):
+        eval_metrics = {
+            "eval/returns": jnp.array([[[1.0, 3.0], [2.0, 4.0]]], dtype=jnp.float32),  # [A=1,B=2,E=2]
+            "eval/lengths": jnp.array([[[10, 14], [12, 16]]], dtype=jnp.int32),
+            "eval/achievements": jnp.array(
+                [[[[True, False], [True, True]], [[False, True], [False, False]]]],
+                dtype=jnp.bool_,
+            ),  # [1,2,2,2]
+            "eval/batch_idx": jnp.array(5, dtype=jnp.int32),
+            "eval/total_steps": jnp.array(1000, dtype=jnp.int32),
+        }
+
+        payload = build_eval_log_payload(
+            eval_metrics=eval_metrics,
+            evaluation_alpha_labels=("unused",),
+            achievement_names=("Achievements/a", "Achievements/b"),
+            training_mode="baseline",
+        )
+
+        self.assertIn("eval/return_mean", payload)
+        self.assertNotIn("eval/unused/return_mean", payload)
+        self.assertIn("eval/achievement_success_percentage/Achievements/a", payload)
+
+    def test_log_outer_batch_to_wandb_baseline_has_no_curriculum_histogram(self):
+        fake_wandb = _FakeWandb()
+        config = SimpleNamespace(
+            training_mode="baseline",
+            selected_intrinsic_modules=(),
+            evaluation_alpha_labels=("dummy",),
+        )
+        batch_metrics = {
+            "run/batch_idx": jnp.array(1, dtype=jnp.int32),
+            "run/total_env_steps": jnp.array(128, dtype=jnp.int32),
+            "time/cumulative_wall_clock_sec": jnp.array(1.0, dtype=jnp.float32),
+            "time/env_steps_per_sec": jnp.array(128.0, dtype=jnp.float32),
+            "preproc/weighted_adv_mean": jnp.array(0.1, dtype=jnp.float32),
+            "preproc/weighted_adv_std": jnp.array(0.2, dtype=jnp.float32),
+            "ppo/total_loss": jnp.array(0.3, dtype=jnp.float32),
+            "ppo/actor_loss": jnp.array(0.4, dtype=jnp.float32),
+            "ppo/entropy": jnp.array(0.5, dtype=jnp.float32),
+            "ppo/approx_kl": jnp.array(0.6, dtype=jnp.float32),
+            "preproc/adv_raw_mean": jnp.array([0.1], dtype=jnp.float32),
+            "preproc/adv_norm_mean": jnp.array([0.0], dtype=jnp.float32),
+            "preproc/adv_norm_std": jnp.array([1.0], dtype=jnp.float32),
+            "ppo/value_loss": jnp.array([0.2], dtype=jnp.float32),
+        }
+        eval_metrics = {
+            "eval/returns": jnp.array([[[1.0]]], dtype=jnp.float32),
+            "eval/lengths": jnp.array([[[10]]], dtype=jnp.int32),
+            "eval/achievements": jnp.array([[[[True]]]], dtype=jnp.bool_),
+            "eval/batch_idx": jnp.array(1, dtype=jnp.int32),
+            "eval/total_steps": jnp.array(128, dtype=jnp.int32),
+        }
+
+        with mock.patch("crew.main_algo.logging.wandb", fake_wandb):
+            log_outer_batch_to_wandb(
+                run=object(),
+                batch_metrics=batch_metrics,
+                config=config,
+                eval_metrics=eval_metrics,
+                achievement_names=("Achievements/a",),
+            )
+
+        payload = fake_wandb.log_calls[0]["payload"]
+        self.assertNotIn("curriculum/alpha/extrinsic_weight_histogram", payload)
+        self.assertIn("eval/return_mean", payload)
 
 
 if __name__ == "__main__":

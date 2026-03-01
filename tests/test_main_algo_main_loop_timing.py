@@ -126,7 +126,7 @@ class TestMainAlgoMainLoopTiming(unittest.TestCase):
             mock.patch("crew.main_algo.main_loop.log_outer_batch_to_wandb"),
             mock.patch(
                 "crew.main_algo.main_loop.time.perf_counter",
-                side_effect=[10.0, 12.0, 20.0, 23.0, 30.0, 31.0],
+                side_effect=[10.0, 12.0, 20.0, 23.0, 30.0, 31.0, 40.0, 41.0],
             ),
             mock.patch("builtins.print") as print_mock,
         ):
