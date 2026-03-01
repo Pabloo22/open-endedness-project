@@ -1,11 +1,17 @@
 # copied from https://github.com/MichaelTMatthews/Craftax_Baselines/blob/150fd6ce26f77c37ebbd5087563f37f80f905727/wrappers.py#L83
 # We added the `SparseCraftaxWrapper` class
 
+from collections.abc import Sequence
 from functools import partial
 
 import jax
 import jax.numpy as jnp
-from craftax.craftax.constants import ACHIEVEMENT_REWARD_MAP, Achievement
+from craftax.craftax import constants as craftax_constants
+from craftax.craftax_classic.envs.craftax_symbolic_env import (
+    CraftaxClassicSymbolicEnv,
+    CraftaxClassicSymbolicEnvNoAutoReset,
+)
+from craftax.craftax_classic import constants as classic_craftax_constants
 
 
 BASIC_ACHIEVEMENT_IDS = list(range(25))
@@ -131,20 +137,27 @@ class SparseCraftaxWrapper(GymnaxWrapper):
         env: The Craftax environment to wrap.
         blocked_achievement_ids:
             Optional list of ``Achievement`` integer values whose reward
-            contribution is removed. Defaults to blocking the basic achievements
-            (IDs 0-24). The original dense reward is stored in ``info["real_reward"]``.
+            contribution is removed. Defaults to not block any achievements.
+            The original dense reward is stored in ``info["real_reward"]``.
     """
 
-    def __init__(self, env, blocked_achievement_ids: list[int] | None = None):
+    def __init__(self, env, blocked_achievement_ids: Sequence[int] | None = None):
         super().__init__(env)
 
-        num_achievements = len(Achievement)
+        if isinstance(env, (CraftaxClassicSymbolicEnv, CraftaxClassicSymbolicEnvNoAutoReset)):
+            num_achievements = len(classic_craftax_constants.Achievement)
+            # Classic craftax doesn't have a reward map because its rewards are all 1, so we can just create a mask.
+            achievement_reward_map = jnp.ones(num_achievements, dtype=jnp.float32)
+        else:
+            num_achievements = len(craftax_constants.Achievement)
+            achievement_reward_map = craftax_constants.ACHIEVEMENT_REWARD_MAP
+
         if blocked_achievement_ids is None:
-            blocked_achievement_ids = BASIC_ACHIEVEMENT_IDS
+            blocked_achievement_ids = []
         blocked_mask = jnp.zeros(num_achievements, dtype=jnp.bool_)
         self._blocked_mask = blocked_mask.at[jnp.array(blocked_achievement_ids, dtype=jnp.int32)].set(True)
         self._blocked_reward_map: jnp.ndarray = (
-            jnp.array(ACHIEVEMENT_REWARD_MAP, dtype=jnp.float32) * self._blocked_mask
+            jnp.array(achievement_reward_map, dtype=jnp.float32) * self._blocked_mask
         )
 
     @partial(jax.jit, static_argnums=(0, 4))
