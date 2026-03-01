@@ -1,10 +1,14 @@
 # copied from https://github.com/MichaelTMatthews/Craftax_Baselines/blob/150fd6ce26f77c37ebbd5087563f37f80f905727/wrappers.py#L83
-
+# We added the `SparseCraftaxWrapper` class
 
 from functools import partial
 
 import jax
 import jax.numpy as jnp
+from craftax.craftax.constants import ACHIEVEMENT_REWARD_MAP, Achievement
+
+
+BASIC_ACHIEVEMENT_IDS = list(range(25))
 
 
 class GymnaxWrapper(object):
@@ -117,3 +121,39 @@ class OptimisticResetVecEnvWrapper(GymnaxWrapper):
         state, obs = jax.vmap(auto_reset)(done, state_re, state_st, obs_re, obs_st)
 
         return obs, state, reward, done, info
+
+
+class SparseCraftaxWrapper(GymnaxWrapper):
+    """Wraps any Craftax environment (symbolic or pixel) to sparsify extrinsic
+    rewards by removing the contribution of specified achievements.
+
+    Args:
+        env: The Craftax environment to wrap.
+        blocked_achievement_ids:
+            Optional list of ``Achievement`` integer values whose reward
+            contribution is removed. Defaults to blocking the basic achievements
+            (IDs 0-24). The original dense reward is stored in ``info["real_reward"]``.
+    """
+
+    def __init__(self, env, blocked_achievement_ids: list[int] | None = None):
+        super().__init__(env)
+
+        num_achievements = len(Achievement)
+        if blocked_achievement_ids is None:
+            blocked_achievement_ids = BASIC_ACHIEVEMENT_IDS
+        blocked_mask = jnp.zeros(num_achievements, dtype=jnp.bool_)
+        self._blocked_mask = blocked_mask.at[jnp.array(blocked_achievement_ids, dtype=jnp.int32)].set(True)
+        self._blocked_reward_map: jnp.ndarray = (
+            jnp.array(ACHIEVEMENT_REWARD_MAP, dtype=jnp.float32) * self._blocked_mask
+        )
+
+    @partial(jax.jit, static_argnums=(0, 4))
+    def step(self, rng, state, action, params=None):
+        obs, next_state, reward, done, info = self._env.step(rng, state, action, params)
+
+        newly_unlocked = next_state.achievements & ~state.achievements
+        blocked_reward = (newly_unlocked.astype(jnp.float32) * self._blocked_reward_map).sum()
+        info["real_reward"] = reward
+        adjusted_reward = reward - blocked_reward
+
+        return obs, next_state, adjusted_reward, done, info
