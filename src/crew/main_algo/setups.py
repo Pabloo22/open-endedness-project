@@ -9,6 +9,7 @@ from flax.training.train_state import TrainState
 
 from crew.main_algo.actor_critic import ActorCriticTransformer
 from crew.main_algo.config import TrainConfig
+from crew.main_algo.curriculum.lp_normalization import init_lp_normalization_stats
 from crew.main_algo.curriculum.replay_buffer import init_alpha_score_replay_buffer
 from crew.main_algo.curriculum.score_predictor import init_score_predictor_train_state
 from crew.main_algo.intrinsic_modules.api import IntrinsicModule
@@ -19,7 +20,11 @@ from crew.main_algo.types import (
     IntrinsicStates,
     RewardNormalizationStats,
 )
-from crew.shared_code.wrappers import AutoResetEnvWrapper, SparseCraftaxWrapper, BASIC_ACHIEVEMENT_IDS  
+from crew.main_algo.wrappers import (
+    BASIC_ACHIEVEMENT_IDS,
+    AutoResetEnvWrapper,
+    SparseCraftaxWrapper,
+)
 
 
 def setup_actor_critic_train_state(
@@ -127,9 +132,13 @@ def initialize_curriculum_state(
         rng=predictor_init_rng,
         config=config,
     )
+    lp_normalization_stats = init_lp_normalization_stats(
+        num_reward_functions=config.num_reward_functions,
+    )
     curriculum_state = CurriculumState(
         alpha_score_replay_buffer=alpha_score_replay_buffer,
         score_predictor_train_state=score_predictor_train_state,
+        lp_normalization_stats=lp_normalization_stats,
         num_batches_seen=jnp.array(0, dtype=jnp.int32),
     )
     return rng, curriculum_state

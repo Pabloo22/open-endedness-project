@@ -7,8 +7,12 @@ import jax.tree_util as jtu
 from flax.training.train_state import TrainState
 from jax.tree_util import Partial
 
+from crew.main_algo.config import TrainConfig
 from crew.main_algo.curriculum.alpha_sampling import sample_alpha_batch
 from crew.main_algo.curriculum.lp_estimation import estimate_lp_per_reward_function
+from crew.main_algo.curriculum.lp_normalization import (
+    update_lp_normalization_stats_from_data,
+)
 from crew.main_algo.curriculum.replay_buffer import add_alpha_score_batch
 from crew.main_algo.curriculum.score_estimation import compute_scores
 from crew.main_algo.curriculum.score_predictor import train_score_predictor_on_buffer
@@ -29,7 +33,6 @@ from crew.main_algo.types import (
     RewardNormalizationStats,
     RunnerStateTransformer,
 )
-from crew.main_algo.config import TrainConfig
 
 
 def train_one_iteration(
@@ -78,9 +81,19 @@ def train_one_iteration(
         config.past_context_length + 1,
         dtype=jnp.int32,
     )
-    reward_normalization_stats = reward_normalization_stats.replace(
-        running_forward_return=jnp.zeros_like(reward_normalization_stats.running_forward_return),
-    )
+    if config.reset_normalization_running_forward_return_on_new_alpha:
+        running_forward_return = jnp.zeros_like(reward_normalization_stats.running_forward_return)
+        reward_normalization_stats = reward_normalization_stats.replace(
+            running_forward_return=running_forward_return,
+        )
+    else:
+        previous_done = jnp.broadcast_to(
+            config.is_episodic_per_reward_function[None, :],
+            reward_normalization_stats.running_forward_return.shape,
+        )
+        reward_normalization_stats = reward_normalization_stats.replace(
+            previous_done=previous_done,
+        )
 
     ############ Data collection and agent training ############
 
@@ -139,13 +152,23 @@ def train_one_iteration(
     )
 
     ############### LP estimation, score computation, and buffer updates ############
-    lp_per_reward_function, single_episode_env_mask = estimate_lp_per_reward_function(
+    lp_raw_per_reward_function, insufficient_episodes_env_mask = estimate_lp_per_reward_function(
         lp_estimation_data=lp_estimation_data,
-        reward_normalization_stats=reward_normalization_stats,
         is_episodic_per_reward_function=config.is_episodic_per_reward_function,
         gamma_per_reward_function=config.gamma_per_reward_function,
         eps=config.reward_norm_eps,
     )
+
+    lp_normalization_stats = update_lp_normalization_stats_from_data(
+        old_stats=curriculum_state.lp_normalization_stats,
+        lp_estimation_data=lp_estimation_data,
+        is_episodic_per_reward_function=config.is_episodic_per_reward_function,
+        gamma_per_reward_function=config.gamma_per_reward_function,
+        ema_beta=config.curriculum.lp_norm_ema_beta,
+        eps=config.reward_norm_eps,
+    )
+    lp_sigma_per_reward_function = jnp.sqrt(lp_normalization_stats.var + config.reward_norm_eps)  # [R]
+    lp_per_reward_function = lp_raw_per_reward_function / lp_sigma_per_reward_function[None, :]
     scores, score_metrics = compute_scores(
         alpha_batch=alpha_batch,
         lp_per_reward_function=lp_per_reward_function,
@@ -153,8 +176,8 @@ def train_one_iteration(
         score_lambda=config.curriculum.score_lambda,
     )
 
-    # Envs with only one completed episode have non-valid score targets.
-    score_datapoint_is_valid = jnp.logical_not(single_episode_env_mask.astype(jnp.bool_))
+    # Envs with fewer than two completed episodes have non-valid score targets.
+    score_datapoint_is_valid = jnp.logical_not(insufficient_episodes_env_mask.astype(jnp.bool_))
     alpha_score_replay_buffer = add_alpha_score_batch(
         alpha_score_replay_buffer=curriculum_state.alpha_score_replay_buffer,
         alpha_batch=alpha_batch,
@@ -163,6 +186,7 @@ def train_one_iteration(
     )
     curriculum_state = curriculum_state.replace(
         alpha_score_replay_buffer=alpha_score_replay_buffer,
+        lp_normalization_stats=lp_normalization_stats,
     )
     rng, score_predictor_train_state, predictor_metrics = train_score_predictor_on_buffer(
         rng=rng,
