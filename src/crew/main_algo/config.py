@@ -40,6 +40,7 @@ class CurriculumConfig:
     importance_num_candidates_multiplier: int = 10
     min_batches_for_predictor_sampling: int = 1
     sampling_weights_eps: float = 1e-8
+    lp_norm_ema_beta: float = 0.05
 
     SUPPORTED_SCORE_LP_MODES: ClassVar[tuple[str, ...]] = ("alp", "lp")
     SUPPORTED_PREDICTOR_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
@@ -80,6 +81,7 @@ class TrainConfig:
     reward_norm_eps: float = 1e-8
     adv_norm_eps: float = 1e-8
     reward_norm_clip: float | None = None
+    reset_normalization_running_forward_return_on_new_alpha: bool = False
 
     # encoder
     obs_emb_dim: int = 256
@@ -318,6 +320,12 @@ class TrainConfig:
             raise ValueError(msg)
         if self.curriculum.min_batches_for_predictor_sampling < 0:
             msg = f"curriculum.min_batches_for_predictor_sampling must be >= 0. Received {self.curriculum.min_batches_for_predictor_sampling}."
+            raise ValueError(msg)
+        if not (0.0 < self.curriculum.lp_norm_ema_beta <= 1.0):
+            msg = (
+                "curriculum.lp_norm_ema_beta must be in (0, 1]. "
+                f"Received {self.curriculum.lp_norm_ema_beta}."
+            )
             raise ValueError(msg)
 
         buffer_capacity = self.curriculum.replay_buffer_num_batches * self.num_envs_per_batch

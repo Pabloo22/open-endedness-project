@@ -3,7 +3,7 @@
 import jax
 import jax.numpy as jnp
 
-from crew.main_algo.types import LpEstimationData, RewardNormalizationStats
+from crew.main_algo.types import LpEstimationData
 
 
 def _ols_slope(x: jax.Array, y: jax.Array, eps: float) -> jax.Array:
@@ -217,36 +217,32 @@ def _estimate_lp_single_env_single_reward(
     done_ut: jax.Array,
     is_episodic: jax.Array,
     gamma: jax.Array,
-    sigma_return: jax.Array,
     eps: float,
 ) -> jax.Array:
-    """Estimate normalized signed LP for one env and one reward function."""
-    raw_slope = jax.lax.cond(
+    """Estimate raw signed LP slope for one env and one reward function."""
+    return jax.lax.cond(
         is_episodic,
         lambda _: _estimate_episodic_lp_for_stream(rewards_ut=rewards_ut, done_ut=done_ut, eps=eps),
         lambda _: _estimate_lifetime_lp_for_stream(rewards_ut=rewards_ut, gamma=gamma, eps=eps),
         operand=None,
     )
-    return raw_slope / sigma_return.astype(raw_slope.dtype)
 
 
 def estimate_lp_per_reward_function(
     lp_estimation_data: LpEstimationData,
-    reward_normalization_stats: RewardNormalizationStats,
     is_episodic_per_reward_function: jax.Array,
     gamma_per_reward_function: jax.Array,
     eps: float = 1e-8,
 ) -> tuple[jax.Array, jax.Array]:
-    """Estimate signed LP for each env/reward pair.
+    """Estimate raw signed LP slope for each env/reward pair.
 
     Key Input Shapes:
     - lp_estimation_data.raw_rewards, done_masks: [U, T, B, R]
-    - reward_normalization_stats.var: [R]
     - is_episodic_per_reward_function: [R]
     - gamma_per_reward_function: [R]
     - returns:
-      - lp_per_reward_function: [B, R]
-      - single_episode_env_mask: [B], int32 in {0,1}
+      - lp_per_reward_function: [B, R] (raw slope, unnormalized)
+      - insufficient_episodes_env_mask: [B], int32 in {0,1}
     """
     raw_rewards = lp_estimation_data.raw_rewards
     done_masks = lp_estimation_data.done_masks
@@ -254,11 +250,10 @@ def estimate_lp_per_reward_function(
     # Reorder to [B, R, U, T].
     rewards_brut = jnp.transpose(raw_rewards, (2, 3, 0, 1))
     done_masks_brut = jnp.transpose(done_masks, (2, 3, 0, 1))
-    sigma_per_reward_function = jnp.sqrt(reward_normalization_stats.var + eps)
 
-    # check for envs with only one episode
+    # Envs with fewer than two completed episodes are not valid for score targets.
     completed_episodes_per_env = jnp.sum(done_masks[..., 0].astype(jnp.int32), axis=(0, 1))  # [B]
-    single_episode_env_mask = (completed_episodes_per_env == 1).astype(jnp.int32)  # [B]
+    insufficient_episodes_env_mask = (completed_episodes_per_env < 2).astype(jnp.int32)  # [B]
 
     def estimate_for_single_env(
         rewards_rut: jax.Array,
@@ -266,13 +261,12 @@ def estimate_lp_per_reward_function(
     ) -> jax.Array:
         return jax.vmap(
             _estimate_lp_single_env_single_reward,
-            in_axes=(0, 0, 0, 0, 0, None),
+            in_axes=(0, 0, 0, 0, None),
         )(
             rewards_rut,
             done_masks_rut,
             is_episodic_per_reward_function,
             gamma_per_reward_function,
-            sigma_per_reward_function,
             eps,
         )
 
@@ -280,4 +274,4 @@ def estimate_lp_per_reward_function(
         estimate_for_single_env,
         in_axes=(0, 0),
     )(rewards_brut, done_masks_brut)
-    return lp_per_reward_function, single_episode_env_mask
+    return lp_per_reward_function, insufficient_episodes_env_mask

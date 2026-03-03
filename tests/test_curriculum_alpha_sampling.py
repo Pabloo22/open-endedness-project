@@ -7,6 +7,7 @@ import numpy as np
 from jax.tree_util import Partial
 
 from crew.main_algo.curriculum.alpha_sampling import sample_alpha_batch
+from crew.main_algo.curriculum.lp_normalization import init_lp_normalization_stats
 from crew.main_algo.curriculum.replay_buffer import init_alpha_score_replay_buffer
 from crew.main_algo.curriculum.score_predictor import init_score_predictor_train_state
 from crew.main_algo.types import CurriculumState
@@ -42,9 +43,11 @@ class TestCurriculumAlphaSampling(unittest.TestCase):
             rng=jax.random.key(0),
             config=config,
         )
+        lp_normalization_stats = init_lp_normalization_stats(config.num_reward_functions)
         curriculum_state = CurriculumState(
             alpha_score_replay_buffer=replay_buffer,
             score_predictor_train_state=predictor_train_state,
+            lp_normalization_stats=lp_normalization_stats,
             num_batches_seen=jnp.array(0, dtype=jnp.int32),
         )
 
@@ -67,9 +70,11 @@ class TestCurriculumAlphaSampling(unittest.TestCase):
             rng=jax.random.key(2),
             config=config,
         )
+        lp_normalization_stats = init_lp_normalization_stats(config.num_reward_functions)
         curriculum_state = CurriculumState(
             alpha_score_replay_buffer=replay_buffer,
             score_predictor_train_state=predictor_train_state,
+            lp_normalization_stats=lp_normalization_stats,
             num_batches_seen=jnp.array(1, dtype=jnp.int32),
         )
 
@@ -92,9 +97,11 @@ class TestCurriculumAlphaSampling(unittest.TestCase):
             rng=jax.random.key(4),
             config=config,
         )
+        lp_normalization_stats = init_lp_normalization_stats(config.num_reward_functions)
         warmup_state = CurriculumState(
             alpha_score_replay_buffer=replay_buffer,
             score_predictor_train_state=predictor_train_state,
+            lp_normalization_stats=lp_normalization_stats,
             num_batches_seen=jnp.array(0, dtype=jnp.int32),
         )
         predictor_state = warmup_state.replace(num_batches_seen=jnp.array(1, dtype=jnp.int32))
