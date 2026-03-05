@@ -12,7 +12,6 @@ packages = [
 [tool.poetry.dependencies]
 python = "^3.12"
 optax = ">=0.2.4"
-jax = ">=0.4.38"
 flax = ">=0.10.3"
 distrax = ">=0.1.5"
 chex = ">=0.1.88"
