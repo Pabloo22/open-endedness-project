@@ -94,7 +94,7 @@ if __name__ == "__main__":
         total_timesteps=100_000,
         env_id="Craftax-Classic-Symbolic-v1",
         achievement_ids_to_block=tuple(range(15)),  # Block the first n achievements for testing.
-        training_mode="baseline",  # "curriculum" or "baseline"
+        training_mode="curriculum",  # "curriculum" or "baseline"
         selected_intrinsic_modules=("rnd",),
         baseline_fixed_training_alpha=(0.8, 0.2),  # Only used in baseline mode.
         num_envs_per_batch=64,
