@@ -22,7 +22,7 @@ For choosing the values to fix on the base agent training, you can also look int
 |---|---|---|---|
 | `train_seed` | Global RNG seed | Keep fixed for debugging; sweep multiple seeds for final comparisons. | any 3-5+ seeds for final experiments |
 | `env_id` | Craftax environment variant. `"Craftax-Classic-Symbolic-v1"`, `"Craftax-Symbolic-v1"` | Use `"Craftax-Classic-Symbolic-v1"` for debugging and hyp tuning. It is faster and simpler. Use  `"Craftax-Symbolic-v1"` for final experiments | - |
-| `achievement_ids_to_block` | Removes selected extrinsic achievement rewards via wrapper. | Helps try different setupd during both development and final evaluations | - |
+| `achievement_ids_to_block` | Removes selected extrinsic achievement rewards via wrapper. | Helps try different setups during both development and final evaluations | - |
 | `remove_health_reward` | Removes health-delta reward from extrinsic signal. | - | - |
 | `episode_max_steps` | Overrides per-episode horizon (`None` keeps env default). Shorter horizons allow better LP estimation but simplify the env and can potentially make certain achievements too hard. Note episodes are usually much shorter because agent dies. | Priority: high. Can try different values during development. starting with lower. | `None`, `1000-3000-5000-10000`. Default: `3000`. |
 | `training_mode` | Chooses curriculum alpha sampling vs fixed-alpha baseline pipeline.  `"curriculum"`, `"baseline"`| - | - |
