@@ -16,9 +16,6 @@ from craftax.craftax_classic.envs.craftax_symbolic_env import (
 from craftax.craftax_classic import constants as classic_craftax_constants
 
 
-BASIC_ACHIEVEMENT_IDS = list(range(25))
-
-
 class GymnaxWrapper(object):
     """Base class for Gymnax wrappers."""
 
