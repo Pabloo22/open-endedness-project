@@ -13,7 +13,6 @@ packages = [
 python = "^3.12"
 optax = ">=0.2.4"
 flax = ">=0.10.3"
-distrax = ">=0.1.5"
 chex = ">=0.1.88"
 orbax-checkpoint = ">=0.11.5"
 craftax = "^1.5.0"
