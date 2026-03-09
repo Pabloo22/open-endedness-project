@@ -8,7 +8,7 @@ Typical workflow:
 1. Adjust the search space in ``build_default_sweep_config`` to the config
     fields and value ranges you want to tune.
 2. Start a new sweep and agent with a command such as
-    ``poetry run python -m crew.experiments.wandb_random_search --count 100 --training-mode baseline``.
+    ``poetry run python -m crew.experiments.wandb_random_search --count 100 --tuning-phase generic``.
 3. If you only want to create the sweep and inspect it in W&B before running
     trials, use ``--create-only``.
 4. If you already have a sweep id, reuse it with ``--sweep-id <id>``.
@@ -29,9 +29,11 @@ full checkpoint and training artifacts.
 from __future__ import annotations
 
 import argparse
+import ast
 import copy
 import dataclasses
 import hashlib
+import json
 from collections.abc import Mapping
 from typing import Any, cast
 
@@ -39,27 +41,54 @@ import numpy as np
 import wandb
 
 from crew.experiments.run_training import run_main_algo_training
-from crew.experiments.constants import CRAFTAX_CLASSIC_INTERMEDIATE_ACHIEVEMENT_IDS
+from crew.experiments.tuning_configs import (
+    DEFAULT_BASELINE_INTRINSIC_ALPHA as _DEFAULT_BASELINE_INTRINSIC_ALPHA,
+    DEFAULT_INTRINSIC_MODULES,
+    get_curriculum_base_config_for_modules,
+    get_curriculum_search_space,
+    get_generic_base_config,
+    get_generic_search_space,
+    get_intrinsic_base_config,
+    get_intrinsic_search_space,
+)
 from crew.main_algo.config import TrainConfig
 from crew.main_algo.logging import build_wandb_run_name
 
 
 DEFAULT_OBJECTIVE_METRIC = "tuning/objective_eval_return_mean"
-NUM_ENVIRONMENTS_PER_BATCH = 64
+DEFAULT_BASELINE_INTRINSIC_ALPHA = _DEFAULT_BASELINE_INTRINSIC_ALPHA
+
+TUNING_PHASE_GENERIC = "generic"
+TUNING_PHASE_INTRINSIC = "intrinsic"
+TUNING_PHASE_CURRICULUM = "curriculum"
+SUPPORTED_TUNING_PHASES = (
+    TUNING_PHASE_GENERIC,
+    TUNING_PHASE_INTRINSIC,
+    TUNING_PHASE_CURRICULUM,
+)
 
 
 def main() -> None:
     """Create or reuse a W&B sweep and launch the requested number of trials."""
     args = parse_args()
+    intrinsic_modules = tuple(args.intrinsic_modules)
     base_config = build_base_tuning_config(
-        training_mode=args.training_mode,
+        tuning_phase=args.tuning_phase,
+        intrinsic_modules=intrinsic_modules,
         project=args.project,
         entity=args.entity,
         group=args.group,
         train_seed=args.train_seed,
         total_timesteps=args.total_timesteps,
     )
-    sweep_config = build_default_sweep_config(training_mode=args.training_mode)
+    fixed_overrides = parse_fixed_overrides(args.fixed_override)
+    if fixed_overrides:
+        base_config = build_trial_config_from_overrides(base_config=base_config, overrides=fixed_overrides)
+
+    sweep_config = build_default_sweep_config(
+        tuning_phase=args.tuning_phase,
+        intrinsic_modules=intrinsic_modules,
+    )
 
     sweep_id = args.sweep_id
     if sweep_id is None:
@@ -72,7 +101,7 @@ def main() -> None:
 
     wandb.agent(
         sweep_id,
-        function=lambda: _run_single_trial(base_config=base_config, save_results=args.save_results),
+        function=lambda: run_single_trial(base_config=base_config, save_results=args.save_results),
         count=args.count,
         project=args.project,
         entity=args.entity,
@@ -81,43 +110,12 @@ def main() -> None:
 
 def build_default_sweep_config(
     *,
-    training_mode: str,
+    tuning_phase: str,
+    intrinsic_modules: tuple[str, ...] = DEFAULT_INTRINSIC_MODULES,
     objective_metric: str = DEFAULT_OBJECTIVE_METRIC,
 ) -> dict[str, Any]:
-    """Return the default W&B random-search sweep definition for the selected mode."""
-    parameters: dict[str, Any] = {
-        "lr": {"values": [5e-5, 1e-4, 2e-4, 5e-4]},
-        "ent_coef": {"values": [0.0, 0.005, 0.01, 0.02]},
-        "clip_eps": {"values": [0.15, 0.2, 0.25]},
-        "gamma": {"values": [0.99, 0.995, 0.999]},
-        "gae_lambda": {"values": [0.95, 0.99]},
-        "update_epochs": {"values": [1, 2, 4]},
-        "num_minibatches": {
-            "values": [
-                _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 8),  # 64 / 8 = 8
-                _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 4),  # 64 / 4 = 16
-                _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 2),  # 64 / 2 = 32
-            ]
-        },
-        "obs_emb_dim": {"values": [128, 256]},
-        "past_context_length": {"values": [64, 128]},
-        "num_transformer_blocks": {"values": [1, 2]},
-        "transformer_hidden_states_dim": {"values": [64, 128, 192]},
-        "head_hidden_dim": {"values": [64, 128, 256]},
-        "inject_alpha_at_trunk": {"values": [True, False]},
-    }
-
-    if training_mode == "curriculum":
-        parameters.update(
-            {
-                "curriculum.score_lambda": {"values": [0.0, 0.25, 0.5, 0.75, 1.0]},
-                "curriculum.predictor_lr": {"values": [5e-5, 1e-4, 2e-4]},
-                "curriculum.lp_norm_ema_beta": {"values": [0.02, 0.05, 0.1]},
-                "rnd.predictor_network_lr": {"values": [5e-5, 1e-4, 2e-4]},
-                "rnd.output_embedding_dim": {"values": [128, 256]},
-                "rnd.head_hidden_dim": {"values": [128, 256]},
-            }
-        )
+    """Return the default W&B random-search sweep definition for the selected tuning phase."""
+    parameters = build_phase_search_space(tuning_phase=tuning_phase, intrinsic_modules=intrinsic_modules)
 
     return {
         "method": "random",
@@ -126,11 +124,17 @@ def build_default_sweep_config(
     }
 
 
-def _divide_or_raise_error(numerator: int, denominator: int) -> int:
-    """Helper for validating that num_envs_per_batch is divisible by num_minibatches."""
-    if numerator % denominator != 0:
-        raise ValueError(f"{numerator} is not divisible by {denominator}.")
-    return numerator // denominator
+def build_phase_search_space(*, tuning_phase: str, intrinsic_modules: tuple[str, ...]) -> dict[str, Any]:
+    """Return the sweep parameter space for one tuning phase."""
+    if tuning_phase == TUNING_PHASE_GENERIC:
+        return get_generic_search_space()
+    if tuning_phase == TUNING_PHASE_INTRINSIC:
+        return get_intrinsic_search_space(_require_single_intrinsic_module(tuning_phase, intrinsic_modules))
+    if tuning_phase == TUNING_PHASE_CURRICULUM:
+        return get_curriculum_search_space()
+
+    msg = f"Unsupported tuning_phase {tuning_phase!r}. Expected one of {SUPPORTED_TUNING_PHASES}."
+    raise ValueError(msg)
 
 
 def parse_args() -> argparse.Namespace:
@@ -141,16 +145,31 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--entity", type=str, default=None, help="Optional W&B entity/team.")
     parser.add_argument("--group", type=str, default=None, help="Optional W&B group shared across trials.")
     parser.add_argument(
-        "--training-mode",
-        choices=("curriculum", "baseline"),
-        default="curriculum",
-        help="Training pipeline to tune.",
+        "--tuning-phase",
+        choices=SUPPORTED_TUNING_PHASES,
+        required=True,
+        help=(
+            "Which tuning phase to run. "
+            "generic tunes shared PPO/model hyperparameters, intrinsic tunes one intrinsic module in baseline mode, "
+            "and curriculum tunes curriculum-only hyperparameters while using all selected reward functions."
+        ),
     )
-    parser.add_argument("--train-seed", type=int, default=0, help="Base seed used for all trials.")
+    parser.add_argument(
+        "--intrinsic-modules",
+        nargs="+",
+        default=list(DEFAULT_INTRINSIC_MODULES),
+        help=(
+            "Intrinsic modules to include. Use one module for the intrinsic phase. "
+            "Use one or more modules for the curriculum phase, for example --intrinsic-modules rnd icm."
+        ),
+    )
+    parser.add_argument(
+        "--train-seed", type=int, default=0, help="Base seed used for setting the seed of each trial."
+    )
     parser.add_argument(
         "--total-timesteps",
         type=int,
-        default=1_000_000,
+        default=50_000_000,
         help="Total environment steps per trial.",
     )
     parser.add_argument(
@@ -169,12 +188,25 @@ def parse_args() -> argparse.Namespace:
         action="store_true",
         help="Persist the full checkpoint/result artifact for each trial.",
     )
+    parser.add_argument(
+        "--fixed-override",
+        action="append",
+        default=[],
+        metavar="KEY=VALUE",
+        help=(
+            "Apply a fixed override before the sweep starts. "
+            "Use dotted keys and JSON or Python literals, for example "
+            "--fixed-override num_envs_per_batch=128 or "
+            "--fixed-override baseline_fixed_training_alpha='[0.8, 0.2]'."
+        ),
+    )
     return parser.parse_args()
 
 
 def build_base_tuning_config(
     *,
-    training_mode: str,
+    tuning_phase: str,
+    intrinsic_modules: tuple[str, ...] = DEFAULT_INTRINSIC_MODULES,
     entity: str | None,
     group: str | None,
     train_seed: int,
@@ -182,75 +214,80 @@ def build_base_tuning_config(
     project: str = "openendedness-2026",
 ) -> TrainConfig:
     """Build the fixed base training config used as the starting point for every trial."""
-    if training_mode == "baseline":
+    shared_runtime_kwargs = {
+        "train_seed": train_seed,
+        "total_timesteps": total_timesteps,
+        "wandb_project": project,
+        "wandb_entity": entity,
+        "wandb_group": group,
+    }
+
+    if tuning_phase == TUNING_PHASE_GENERIC:
+        return TrainConfig(**cast(Any, {**shared_runtime_kwargs, **get_generic_base_config()}))
+
+    if tuning_phase == TUNING_PHASE_INTRINSIC:
+        intrinsic_module = _require_single_intrinsic_module(tuning_phase, intrinsic_modules)
         return TrainConfig(
-            train_seed=train_seed,
-            total_timesteps=total_timesteps,
-            env_id="Craftax-Classic-Symbolic-v1",
-            achievement_ids_to_block=CRAFTAX_CLASSIC_INTERMEDIATE_ACHIEVEMENT_IDS,
-            training_mode="baseline",
-            remove_health_reward=True,
-            selected_intrinsic_modules=(),
-            baseline_fixed_training_alpha=(1.0,),
-            num_envs_per_batch=64,
-            num_steps_per_env=512,
-            num_steps_per_update=256,
-            eval_every_n_batches=1,
-            eval_num_envs=64,
-            eval_num_episodes=2,
-            evaluation_alphas=((1.0,),),
-            update_epochs=1,
-            num_minibatches=16,
-            obs_emb_dim=256,
-            past_context_length=64,
-            subsequence_length_in_loss_calculation=64,
-            num_attn_heads=4,
-            num_transformer_blocks=1,
-            transformer_hidden_states_dim=64,
-            qkv_features=64,
-            head_hidden_dim=64,
-            enable_wandb=False,
-            wandb_project=project,
-            wandb_entity=entity,
-            wandb_group=group,
-            is_timing_run=False,
+            **cast(
+                Any,
+                {
+                    **shared_runtime_kwargs,
+                    **get_intrinsic_base_config(intrinsic_module),
+                },
+            )
         )
 
-    if training_mode == "curriculum":
+    if tuning_phase == TUNING_PHASE_CURRICULUM:
         return TrainConfig(
-            train_seed=train_seed,
-            total_timesteps=total_timesteps,
-            env_id="Craftax-Classic-Symbolic-v1",
-            achievement_ids_to_block=CRAFTAX_CLASSIC_INTERMEDIATE_ACHIEVEMENT_IDS,
-            remove_health_reward=True,
-            training_mode="curriculum",
-            selected_intrinsic_modules=("rnd",),
-            num_envs_per_batch=64,
-            num_steps_per_env=512,
-            num_steps_per_update=256,
-            eval_every_n_batches=1,
-            eval_num_envs=64,
-            eval_num_episodes=2,
-            evaluation_alphas=((0.8, 0.2), (1.0, 0.0)),
-            update_epochs=1,
-            num_minibatches=16,
-            obs_emb_dim=256,
-            past_context_length=64,
-            subsequence_length_in_loss_calculation=64,
-            num_attn_heads=4,
-            num_transformer_blocks=1,
-            transformer_hidden_states_dim=64,
-            qkv_features=64,
-            head_hidden_dim=64,
-            enable_wandb=False,
-            wandb_project=project,
-            wandb_entity=entity,
-            wandb_group=group,
-            is_timing_run=False,
+            **cast(
+                Any,
+                {
+                    **shared_runtime_kwargs,
+                    **get_curriculum_base_config_for_modules(_require_intrinsic_modules(intrinsic_modules)),
+                },
+            )
         )
 
-    msg = f"Unsupported training_mode {training_mode!r}."
+    msg = f"Unsupported tuning phase {tuning_phase!r}. Expected one of {SUPPORTED_TUNING_PHASES}."
     raise ValueError(msg)
+
+
+def parse_fixed_overrides(raw_overrides: list[str]) -> dict[str, Any]:
+    """Parse repeated KEY=VALUE overrides from the CLI."""
+    parsed: dict[str, Any] = {}
+    for raw_override in raw_overrides:
+        key, separator, raw_value = raw_override.partition("=")
+        if not separator or not key:
+            msg = f"Invalid override {raw_override!r}. Expected KEY=VALUE."
+            raise ValueError(msg)
+        parsed[key] = _parse_override_value(raw_value)
+    return parsed
+
+
+def _parse_override_value(raw_value: str) -> Any:
+    """Parse one CLI override value using JSON first, then Python literals, then raw string."""
+    try:
+        return json.loads(raw_value)
+    except json.JSONDecodeError:
+        try:
+            return ast.literal_eval(raw_value)
+        except (ValueError, SyntaxError):
+            return raw_value
+
+
+def _require_intrinsic_modules(intrinsic_modules: tuple[str, ...]) -> tuple[str, ...]:
+    if not intrinsic_modules:
+        msg = "At least one intrinsic module must be provided for intrinsic and curriculum tuning phases."
+        raise ValueError(msg)
+    return intrinsic_modules
+
+
+def _require_single_intrinsic_module(tuning_phase: str, intrinsic_modules: tuple[str, ...]) -> str:
+    resolved_intrinsic_modules = _require_intrinsic_modules(intrinsic_modules)
+    if len(resolved_intrinsic_modules) != 1:
+        msg = f"{tuning_phase} phase expects exactly one intrinsic module. " f"Received {resolved_intrinsic_modules!r}."
+        raise ValueError(msg)
+    return resolved_intrinsic_modules[0]
 
 
 def build_trial_config_from_overrides(
@@ -355,16 +392,14 @@ def _serialize_for_wandb(value: Any) -> Any:
             for field in dataclasses.fields(value)
             if field.init
         }
-    if isinstance(value, tuple):
-        return [_serialize_for_wandb(item) for item in value]
-    if isinstance(value, list):
+    if isinstance(value, (tuple, list)):
         return [_serialize_for_wandb(item) for item in value]
     if isinstance(value, dict):
         return {key: _serialize_for_wandb(item) for key, item in value.items()}
     return value
 
 
-def _run_single_trial(base_config: TrainConfig, save_results: bool) -> None:
+def run_single_trial(base_config: TrainConfig, save_results: bool) -> None:
     """Execute one sweep trial from sampled W&B overrides through final summary logging."""
     run = wandb.init()
     if run is None:
