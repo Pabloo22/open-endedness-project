@@ -21,7 +21,6 @@ from crew.main_algo.types import (
     RewardNormalizationStats,
 )
 from crew.main_algo.wrappers import (
-    BASIC_ACHIEVEMENT_IDS,
     AutoResetEnvWrapper,
     SparseCraftaxWrapper,
 )
