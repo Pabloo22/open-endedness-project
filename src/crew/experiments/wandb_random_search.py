@@ -169,7 +169,7 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument(
         "--total-timesteps",
         type=int,
-        default=50_000_000,
+        default=100_000_000,
         help="Total environment steps per trial.",
     )
     parser.add_argument(
