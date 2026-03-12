@@ -33,6 +33,7 @@ from crew.main_algo.types import (
     RewardNormalizationStats,
     RunnerStateTransformer,
 )
+from crew.main_algo.wrappers import AutoResetEnvWrapper, OptimisticResetVecEnvWrapper
 
 
 def train_one_iteration(
@@ -53,9 +54,8 @@ def train_one_iteration(
         config=config,
     )
     ########### Sample new envs and reset memory ############
-    rng, reset_rng_base = jax.random.split(rng)
-    reset_rngs = jax.random.split(reset_rng_base, num=config.num_envs_per_batch)
-    prev_obs, env_state = jax.vmap(env.reset, in_axes=(0, None))(reset_rngs, env_params)
+    rng, reset_rng = jax.random.split(rng)
+    prev_obs, env_state = env.reset(reset_rng, env_params)
     prev_done = jnp.zeros((config.num_envs_per_batch,), dtype=jnp.bool_)
 
     memories = jnp.zeros(
@@ -243,7 +243,8 @@ def full_training(
     config: TrainConfig,
 ) -> dict[str, Any]:
     """Main training loop with fixed-alpha windows and intrinsic updates."""
-    achievement_names = infer_achievement_names(env=env, env_params=env_params)
+    eval_env = AutoResetEnvWrapper(env._env) if isinstance(env, OptimisticResetVecEnvWrapper) else env
+    achievement_names = infer_achievement_names(env=eval_env, env_params=env_params)
     wandb_run = init_wandb_run(config=config)
 
     train_one_iteration_jit = jax.jit(
@@ -258,7 +259,7 @@ def full_training(
     evaluate_policy_on_alphas_jit = jax.jit(
         Partial(
             evaluate_policy_on_alphas,
-            env=env,
+            env=eval_env,
             env_params=env_params,
             evaluation_alphas=config.evaluation_alphas_array,
             num_eval_envs=config.eval_num_envs,

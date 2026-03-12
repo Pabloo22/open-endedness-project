@@ -21,7 +21,7 @@ from crew.main_algo.types import (
     RewardNormalizationStats,
 )
 from crew.main_algo.wrappers import (
-    AutoResetEnvWrapper,
+    OptimisticResetVecEnvWrapper,
     SparseCraftaxWrapper,
 )
 
@@ -168,7 +168,12 @@ def set_up_for_training(
         blocked_achievement_ids=config.achievement_ids_to_block,
         remove_health_reward=config.remove_health_reward,
     )
-    env = AutoResetEnvWrapper(base_env)
+    reset_ratio = int(jnp.gcd(config.num_envs_per_batch, 16))
+    env = OptimisticResetVecEnvWrapper(
+        base_env,
+        num_envs=config.num_envs_per_batch,
+        reset_ratio=reset_ratio,
+    )
 
     # Agent setup.
     if config.anneal_lr:
