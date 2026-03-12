@@ -46,7 +46,14 @@ def train_one_iteration(
     env_params: Any,
     intrinsic_modules: tuple[IntrinsicModule, ...],
     config: TrainConfig,
-) -> tuple[jax.Array, TrainState, RewardNormalizationStats, IntrinsicStates, CurriculumState, dict[str, jax.Array]]:
+) -> tuple[
+    jax.Array,
+    TrainState,
+    RewardNormalizationStats,
+    IntrinsicStates,
+    CurriculumState,
+    dict[str, jax.Array],
+]:
     """Run one outer iteration: alpha sampling, inner updates, then intrinsic updates."""
     rng, alpha_batch, alpha_sampling_metrics = sample_alpha_batch(
         rng=rng,
@@ -82,7 +89,9 @@ def train_one_iteration(
         dtype=jnp.int32,
     )
     if config.reset_normalization_running_forward_return_on_new_alpha:
-        running_forward_return = jnp.zeros_like(reward_normalization_stats.running_forward_return)
+        running_forward_return = jnp.zeros_like(
+            reward_normalization_stats.running_forward_return
+        )
         reward_normalization_stats = reward_normalization_stats.replace(
             running_forward_return=running_forward_return,
         )
@@ -152,11 +161,13 @@ def train_one_iteration(
     )
 
     ############### LP estimation, score computation, and buffer updates ############
-    lp_raw_per_reward_function, insufficient_episodes_env_mask = estimate_lp_per_reward_function(
-        lp_estimation_data=lp_estimation_data,
-        is_episodic_per_reward_function=config.is_episodic_per_reward_function,
-        gamma_per_reward_function=config.gamma_per_reward_function,
-        eps=config.reward_norm_eps,
+    lp_raw_per_reward_function, insufficient_episodes_env_mask = (
+        estimate_lp_per_reward_function(
+            lp_estimation_data=lp_estimation_data,
+            is_episodic_per_reward_function=config.is_episodic_per_reward_function,
+            gamma_per_reward_function=config.gamma_per_reward_function,
+            eps=config.reward_norm_eps,
+        )
     )
 
     lp_normalization_stats = update_lp_normalization_stats_from_data(
@@ -167,8 +178,12 @@ def train_one_iteration(
         ema_beta=config.curriculum.lp_norm_ema_beta,
         eps=config.reward_norm_eps,
     )
-    lp_sigma_per_reward_function = jnp.sqrt(lp_normalization_stats.var + config.reward_norm_eps)  # [R]
-    lp_per_reward_function = lp_raw_per_reward_function / lp_sigma_per_reward_function[None, :]
+    lp_sigma_per_reward_function = jnp.sqrt(
+        lp_normalization_stats.var + config.reward_norm_eps
+    )  # [R]
+    lp_per_reward_function = (
+        lp_raw_per_reward_function / lp_sigma_per_reward_function[None, :]
+    )
     scores, score_metrics = compute_scores(
         alpha_batch=alpha_batch,
         lp_per_reward_function=lp_per_reward_function,
@@ -177,7 +192,9 @@ def train_one_iteration(
     )
 
     # Envs with fewer than two completed episodes have non-valid score targets.
-    score_datapoint_is_valid = jnp.logical_not(insufficient_episodes_env_mask.astype(jnp.bool_))
+    score_datapoint_is_valid = jnp.logical_not(
+        insufficient_episodes_env_mask.astype(jnp.bool_)
+    )
     alpha_score_replay_buffer = add_alpha_score_batch(
         alpha_score_replay_buffer=curriculum_state.alpha_score_replay_buffer,
         alpha_batch=alpha_batch,
@@ -188,11 +205,13 @@ def train_one_iteration(
         alpha_score_replay_buffer=alpha_score_replay_buffer,
         lp_normalization_stats=lp_normalization_stats,
     )
-    rng, score_predictor_train_state, predictor_metrics = train_score_predictor_on_buffer(
-        rng=rng,
-        score_predictor_train_state=curriculum_state.score_predictor_train_state,
-        alpha_score_replay_buffer=alpha_score_replay_buffer,
-        config=config,
+    rng, score_predictor_train_state, predictor_metrics = (
+        train_score_predictor_on_buffer(
+            rng=rng,
+            score_predictor_train_state=curriculum_state.score_predictor_train_state,
+            alpha_score_replay_buffer=alpha_score_replay_buffer,
+            config=config,
+        )
     )
     curriculum_state = curriculum_state.replace(
         score_predictor_train_state=score_predictor_train_state,
@@ -206,7 +225,7 @@ def train_one_iteration(
         axis=(0, 1),
     )  # [B]
     alpha_entropy_per_env = -jnp.sum(
-        alpha_batch * jnp.log(jnp.clip(alpha_batch, a_min=1e-8)),
+        alpha_batch * jnp.log(jnp.clip(alpha_batch, min=1e-8)),
         axis=1,
     )  # [B]
 
@@ -217,18 +236,33 @@ def train_one_iteration(
         | score_metrics
         | predictor_metrics
         | {
-            "curriculum/alpha/mean_per_reward_function": jnp.mean(alpha_batch, axis=0),  # [R]
-            "curriculum/alpha/std_per_reward_function": jnp.std(alpha_batch, axis=0),  # [R]
+            "curriculum/alpha/mean_per_reward_function": jnp.mean(
+                alpha_batch, axis=0
+            ),  # [R]
+            "curriculum/alpha/std_per_reward_function": jnp.std(
+                alpha_batch, axis=0
+            ),  # [R]
             "curriculum/alpha/entropy_mean": jnp.mean(alpha_entropy_per_env),  # scalar
-            "curriculum/lp_per_reward_function": jnp.mean(lp_per_reward_function, axis=0),  # [R]
+            "curriculum/lp_per_reward_function": jnp.mean(
+                lp_per_reward_function, axis=0
+            ),  # [R]
             "curriculum/valid_fraction_of_scores_in_batch": jnp.mean(
                 score_datapoint_is_valid.astype(jnp.float32)
             ),  # scalar
-            "curriculum/completed_episodes_per_env_mean": jnp.mean(completed_episodes_per_env),  # scalar
+            "curriculum/completed_episodes_per_env_mean": jnp.mean(
+                completed_episodes_per_env
+            ),  # scalar
             "curriculum/alpha/extrinsic_weight_per_env": alpha_batch[:, 0],  # [B]
         }
     )
-    return rng, agent_train_state, reward_normalization_stats, intrinsic_states, curriculum_state, metrics
+    return (
+        rng,
+        agent_train_state,
+        reward_normalization_stats,
+        intrinsic_states,
+        curriculum_state,
+        metrics,
+    )
 
 
 def full_training(
@@ -243,7 +277,11 @@ def full_training(
     config: TrainConfig,
 ) -> dict[str, Any]:
     """Main training loop with fixed-alpha windows and intrinsic updates."""
-    eval_env = AutoResetEnvWrapper(env._env) if isinstance(env, OptimisticResetVecEnvWrapper) else env
+    eval_env = (
+        AutoResetEnvWrapper(env._env)
+        if isinstance(env, OptimisticResetVecEnvWrapper)
+        else env
+    )
     achievement_names = infer_achievement_names(env=eval_env, env_params=env_params)
     wandb_run = init_wandb_run(config=config)
 
@@ -279,19 +317,27 @@ def full_training(
     for batch_idx in range(config.num_batches_of_envs):
         if config.is_timing_run:
             train_iteration_start_time = time.perf_counter()
-        rng, agent_train_state, reward_normalization_stats, intrinsic_states, curriculum_state, metrics = (
-            train_one_iteration_jit(
-                rng,
-                agent_train_state,
-                reward_normalization_stats,
-                intrinsic_states,
-                curriculum_state,
-            )
+        (
+            rng,
+            agent_train_state,
+            reward_normalization_stats,
+            intrinsic_states,
+            curriculum_state,
+            metrics,
+        ) = train_one_iteration_jit(
+            rng,
+            agent_train_state,
+            reward_normalization_stats,
+            intrinsic_states,
+            curriculum_state,
         )
         if config.is_timing_run:
             metrics = jax.block_until_ready(metrics)
             train_iteration_time_sec = time.perf_counter() - train_iteration_start_time
-            print(f"[timing] batch {batch_idx + 1}: " f"train_one_iteration={train_iteration_time_sec:.6f}s")
+            print(
+                f"[timing] batch {batch_idx + 1}: "
+                f"train_one_iteration={train_iteration_time_sec:.6f}s"
+            )
 
         metrics_per_batch.append(metrics)
         batch_num = batch_idx + 1
@@ -305,8 +351,12 @@ def full_training(
         run_time_metrics = {
             "run/batch_idx": jnp.array(batch_num, dtype=jnp.int32),
             "run/total_env_steps": jnp.array(total_env_steps, dtype=jnp.int32),
-            "time/cumulative_wall_clock_sec": jnp.array(cumulative_wall_clock_sec, dtype=jnp.float32),
-            "time/env_steps_per_sec": jnp.array(env_steps_per_batch / batch_wall_clock_sec, dtype=jnp.float32),
+            "time/cumulative_wall_clock_sec": jnp.array(
+                cumulative_wall_clock_sec, dtype=jnp.float32
+            ),
+            "time/env_steps_per_sec": jnp.array(
+                env_steps_per_batch / batch_wall_clock_sec, dtype=jnp.float32
+            ),
         }
         run_time_metrics_per_batch.append(run_time_metrics)
 
@@ -321,7 +371,9 @@ def full_training(
             if config.is_timing_run:
                 eval_metrics = jax.block_until_ready(eval_metrics)
                 eval_time_sec = time.perf_counter() - eval_start_time
-                print(f"[timing] batch {batch_num}: " f"evaluation={eval_time_sec:.6f}s")
+                print(
+                    f"[timing] batch {batch_num}: " f"evaluation={eval_time_sec:.6f}s"
+                )
             eval_metrics = eval_metrics | {
                 "eval/batch_idx": jnp.array(batch_num, dtype=jnp.int32),
                 "eval/total_steps": jnp.array(total_env_steps, dtype=jnp.int32),
@@ -341,7 +393,9 @@ def full_training(
             )
             if config.is_timing_run:
                 logging_time_sec = time.perf_counter() - logging_start_time
-                print(f"[timing] batch {batch_num}: " f"logging={logging_time_sec:.6f}s")
+                print(
+                    f"[timing] batch {batch_num}: " f"logging={logging_time_sec:.6f}s"
+                )
         except Exception as error:  # pragma: no cover - logging must not stop training
             print(f"Failed to log outer batch to Weights & Biases: {error}")
 

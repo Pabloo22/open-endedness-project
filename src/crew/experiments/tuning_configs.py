@@ -118,30 +118,31 @@ GENERIC_SEARCH_SPACE_V1: dict[str, Any] = {
     "clip_eps": {"values": [0.1, 0.15, 0.175, 0.2, 0.225, 0.25, 0.3]},
     "gamma": {"values": [0.99, 0.995, 0.999]},
     "gae_lambda": {"values": [0.95, 0.99]},
-    # "obs_emb_dim": {"values": [128, 192, 256]},  (Fixed for now to speed up tuning runs)
+    "obs_emb_dim": {
+        "values": [128, 192, 256]
+    },  # (Fixed for now to speed up tuning runs)
     # The following params have "low" or "low/fixed" priority for searching:
-#     "update_epochs": {"values": [1, 2, 4]},
-#     "num_minibatches": {
-#         "values": [
-#             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 8),
-#             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 4),
-#             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 2),
-#         ]
-#     },
-
-#     "past_context_length": {"values": [64, 128]},
-#     "subsequence_length_in_loss_calculation": {"values": [32, 64]},
-#     "num_attn_heads": {"values": [4, 8]},
-#     "num_transformer_blocks": {"values": [1, 2]},
-#     "transformer_hidden_states_dim": {"values": [64, 128, 192]},
-#     "gating": {"values": [True, False]},
-#     "head_activation": {"values": ["relu", "tanh"]},
-#     "head_hidden_dim": {"values": [64, 128, 256]},
-#     "adam_eps": {"values": [1e-8, 1e-5]},
-#     "anneal_lr": {"values": [True, False]},
-#     "vf_coef": {"values": [0.25, 0.5, 1.0]},
-#     "max_grad_norm": {"values": [0.3, 0.5, 1.0]},
-# }
+    "update_epochs": {"values": [1, 2, 4]},
+    "num_minibatches": {
+        "values": [
+            _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 8),
+            _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 4),
+            _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 2),
+        ]
+    },
+    "past_context_length": {"values": [64, 128]},
+    "subsequence_length_in_loss_calculation": {"values": [32, 64]},
+    "num_attn_heads": {"values": [4, 8]},
+    "num_transformer_blocks": {"values": [1, 2]},
+    "transformer_hidden_states_dim": {"values": [64, 128, 192]},
+    "gating": {"values": [True, False]},
+    "head_activation": {"values": ["relu", "tanh"]},
+    "head_hidden_dim": {"values": [64, 128, 256]},
+    "adam_eps": {"values": [1e-8, 1e-5]},
+    "anneal_lr": {"values": [True, False]},
+    "vf_coef": {"values": [0.25, 0.5, 1.0]},
+    "max_grad_norm": {"values": [0.3, 0.5, 1.0]},
+}
 
 RND_INTRINSIC_SEARCH_SPACE_V1: dict[str, Any] = {
     "rnd.predictor_network_lr": {"values": [5e-5, 1e-4, 2e-4]},
@@ -181,16 +182,25 @@ def get_intrinsic_base_config(intrinsic_module: str) -> dict[str, Any]:
     return copy.deepcopy(ACTIVE_INTRINSIC_BASE_CONFIGS[intrinsic_module])
 
 
-def get_curriculum_base_config_for_modules(module_names: tuple[str, ...]) -> dict[str, Any]:
+def get_curriculum_base_config_for_modules(
+    module_names: tuple[str, ...],
+) -> dict[str, Any]:
     """Return the current curriculum-phase base config for one intrinsic-module set."""
     normalized_module_names = normalize_intrinsic_modules(module_names)
-    if normalized_module_names not in ACTIVE_CURRICULUM_BASE_CONFIGS:
+    normalized_presets = {
+        normalize_intrinsic_modules(k): v
+        for k, v in ACTIVE_CURRICULUM_BASE_CONFIGS.items()
+    }
+    if normalized_module_names not in normalized_presets:
         msg = (
             f"Unsupported intrinsic modules {normalized_module_names!r} for curriculum tuning presets. "
-            f"Supported modules: {tuple(ACTIVE_CURRICULUM_BASE_CONFIGS)}."
+            f"Supported modules: {tuple(normalized_presets)}."
         )
         raise ValueError(msg)
-    return copy.deepcopy(ACTIVE_CURRICULUM_BASE_CONFIGS[normalized_module_names])
+    print("-" * 20)
+    print(normalized_presets)
+    print("-" * 20)
+    return copy.deepcopy(normalized_presets[normalized_module_names])
 
 
 def get_generic_search_space() -> dict[str, Any]:
