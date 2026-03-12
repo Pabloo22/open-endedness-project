@@ -66,6 +66,7 @@ class TrainConfig:
 
     update_epochs: int = 1
     num_minibatches: int = 16
+    optimistic_reset_ratio_limit: int = 16
 
     adam_eps: float = 1e-5
     lr: float = 2e-4
@@ -203,9 +204,13 @@ class TrainConfig:
             or self.num_steps_per_env <= 0
             or self.num_steps_per_update <= 0
             or self.num_minibatches <= 0
+            or self.optimistic_reset_ratio_limit <= 0
             or self.subsequence_length_in_loss_calculation <= 0
         ):
-            msg = "num_envs_per_batch, num_steps_per_env, num_steps_per_update, num_minibatches, and subsequence_length_in_loss_calculation must be > 0."
+            msg = (
+                "num_envs_per_batch, num_steps_per_env, num_steps_per_update, num_minibatches, "
+                "optimistic_reset_ratio_limit, and subsequence_length_in_loss_calculation must be > 0."
+            )
             raise ValueError(msg)
 
         if self.num_envs_per_batch % self.num_minibatches != 0:

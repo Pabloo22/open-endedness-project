@@ -26,6 +26,14 @@ from crew.main_algo.wrappers import (
 )
 
 
+def _resolve_optimistic_reset_ratio(num_envs: int, ratio_limit: int) -> int:
+    upper_bound = min(num_envs, ratio_limit)
+    for candidate in range(upper_bound, 0, -1):
+        if num_envs % candidate == 0:
+            return candidate
+    return 1
+
+
 def setup_actor_critic_train_state(
     rng: jax.Array,
     env: Any,
@@ -168,7 +176,10 @@ def set_up_for_training(
         blocked_achievement_ids=config.achievement_ids_to_block,
         remove_health_reward=config.remove_health_reward,
     )
-    reset_ratio = int(jnp.gcd(config.num_envs_per_batch, 16))
+    reset_ratio = _resolve_optimistic_reset_ratio(
+        num_envs=config.num_envs_per_batch,
+        ratio_limit=config.optimistic_reset_ratio_limit,
+    )
     env = OptimisticResetVecEnvWrapper(
         base_env,
         num_envs=config.num_envs_per_batch,
