@@ -1,7 +1,6 @@
 import unittest
 from types import SimpleNamespace
 
-import distrax
 import jax
 import jax.numpy as jnp
 import numpy as np
@@ -9,6 +8,7 @@ import optax
 from flax.training.train_state import TrainState
 from jax.tree_util import Partial
 
+from crew.main_algo.actor_critic import Categorical
 from crew.main_algo.evaluation import evaluate_policy_on_alphas, infer_achievement_names
 
 
@@ -42,7 +42,7 @@ def _dummy_apply_fn(params, memories, observations, mask, alpha_batch, method=No
     batch_size = observations.shape[0]
     num_reward_functions = alpha_batch.shape[1]
     logits = jnp.zeros((batch_size, 2), dtype=jnp.float32)
-    pi = distrax.Categorical(logits=logits)
+    pi = Categorical(logits=logits)
     values = jnp.zeros((batch_size, num_reward_functions), dtype=jnp.float32)
     memory_out = jnp.zeros((batch_size, memories.shape[2], memories.shape[3]), dtype=memories.dtype)
     return pi, values, memory_out
