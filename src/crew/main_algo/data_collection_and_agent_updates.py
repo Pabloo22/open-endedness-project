@@ -221,10 +221,9 @@ def step_envs(
     memories = jnp.roll(runner_state.memories, -1, axis=1).at[:, -1].set(memories_out)
 
     # Step environments
-    rng, step_rng_base = jax.random.split(rng)
-    step_rngs = jax.random.split(step_rng_base, num=config.num_envs_per_batch)
-    next_obs, env_state, reward, done, _ = jax.vmap(env.step, in_axes=(0, 0, 0, None))(
-        step_rngs,
+    rng, step_rng = jax.random.split(rng)
+    next_obs, env_state, reward, done, _ = env.step(
+        step_rng,
         runner_state.env_state,
         action,
         env_params,
