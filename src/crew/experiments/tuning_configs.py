@@ -141,7 +141,7 @@ GENERIC_SEARCH_SPACE_V1: dict[str, Any] = {
 #     "anneal_lr": {"values": [True, False]},
 #     "vf_coef": {"values": [0.25, 0.5, 1.0]},
 #     "max_grad_norm": {"values": [0.3, 0.5, 1.0]},
-# }
+}
 
 RND_INTRINSIC_SEARCH_SPACE_V1: dict[str, Any] = {
     "rnd.predictor_network_lr": {"values": [5e-5, 1e-4, 2e-4]},
