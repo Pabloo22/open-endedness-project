@@ -182,16 +182,25 @@ def get_intrinsic_base_config(intrinsic_module: str) -> dict[str, Any]:
     return copy.deepcopy(ACTIVE_INTRINSIC_BASE_CONFIGS[intrinsic_module])
 
 
-def get_curriculum_base_config_for_modules(module_names: tuple[str, ...]) -> dict[str, Any]:
+def get_curriculum_base_config_for_modules(
+    module_names: tuple[str, ...],
+) -> dict[str, Any]:
     """Return the current curriculum-phase base config for one intrinsic-module set."""
     normalized_module_names = normalize_intrinsic_modules(module_names)
-    if normalized_module_names not in ACTIVE_CURRICULUM_BASE_CONFIGS:
+    normalized_presets = {
+        normalize_intrinsic_modules(k): v
+        for k, v in ACTIVE_CURRICULUM_BASE_CONFIGS.items()
+    }
+    if normalized_module_names not in normalized_presets:
         msg = (
             f"Unsupported intrinsic modules {normalized_module_names!r} for curriculum tuning presets. "
-            f"Supported modules: {tuple(ACTIVE_CURRICULUM_BASE_CONFIGS)}."
+            f"Supported modules: {tuple(normalized_presets)}."
         )
         raise ValueError(msg)
-    return copy.deepcopy(ACTIVE_CURRICULUM_BASE_CONFIGS[normalized_module_names])
+    print("-" * 20)
+    print(normalized_presets)
+    print("-" * 20)
+    return copy.deepcopy(normalized_presets[normalized_module_names])
 
 
 def get_generic_search_space() -> dict[str, Any]:
