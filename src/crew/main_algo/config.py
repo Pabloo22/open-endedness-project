@@ -1,7 +1,7 @@
 """Configuration objects for the main algorithm training stack."""
 
-from collections.abc import Sequence
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
@@ -19,6 +19,29 @@ class RNDConfig:
     predictor_network_lr: float = 1e-4
     predictor_update_epochs: int = 1
     predictor_num_minibatches: int = 64
+    num_chunks_in_rewards_computation: int = 64
+    gamma: float = 0.99
+    gae_lambda: float = 0.95
+
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = ("flat_symbolic",)
+    SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+
+
+@dataclass
+class NGUConfig:
+    encoder_mode: str = "flat_symbolic"
+    output_embedding_dim: int = 64  # Size of KNN embedding space
+    head_activation: str = "relu"
+    head_hidden_dim: int = 64  # MLP hidden size
+
+    episodic_memory_capacity: int = 1000  # max embeddings stored per env per episode
+    num_neighbors: int = 10
+    kernel_epsilon: float = 1e-3
+    kernel_cluster_distance: float = 1e-3
+
+    embedding_network_lr: float = 1e-4
+    embedding_update_epochs: int = 1
+    embedding_num_minibatches: int = 64
     num_chunks_in_rewards_computation: int = 64
     gamma: float = 0.99
     gae_lambda: float = 0.95
@@ -115,6 +138,7 @@ class TrainConfig:
     gae_lambda_per_reward_function: jnp.ndarray = field(init=False)
     curriculum: CurriculumConfig = field(default_factory=CurriculumConfig)
     rnd: RNDConfig = field(default_factory=RNDConfig)
+    ngu: NGUConfig = field(default_factory=NGUConfig)
 
     # eval
     eval_every_n_batches: int = 1
@@ -142,7 +166,10 @@ class TrainConfig:
 
     def __post_init__(self):
         if self.training_mode not in self.SUPPORTED_TRAINING_MODES:
-            msg = f"training_mode must be one of {self.SUPPORTED_TRAINING_MODES}. " f"Received {self.training_mode!r}."
+            msg = (
+                f"training_mode must be one of {self.SUPPORTED_TRAINING_MODES}. "
+                f"Received {self.training_mode!r}."
+            )
             raise ValueError(msg)
 
         if self.env_id not in self.SUPPORTED_ENV_IDS:
@@ -150,9 +177,7 @@ class TrainConfig:
             raise ValueError(msg)
 
         if self.head_activation not in self.SUPPORTED_HEAD_ACTIVATIONS:
-            msg = (
-                f"head_activation must be one of {self.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.head_activation!r}."
-            )
+            msg = f"head_activation must be one of {self.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.head_activation!r}."
             raise ValueError(msg)
 
         self._validate_selected_intrinsic_modules()
@@ -160,12 +185,20 @@ class TrainConfig:
         self._validate_selected_module_configs()
         self.num_reward_functions = 1 + len(self.selected_intrinsic_modules)
         self._apply_mode_specific_overrides()
-        self.baseline_fixed_training_alpha = self._resolve_baseline_fixed_training_alpha()
-        self.is_episodic_per_reward_function = self._build_is_episodic_per_reward_function()
+        self.baseline_fixed_training_alpha = (
+            self._resolve_baseline_fixed_training_alpha()
+        )
+        self.is_episodic_per_reward_function = (
+            self._build_is_episodic_per_reward_function()
+        )
         self.gamma_per_reward_function = self._build_gamma_per_reward_function()
-        self.gae_lambda_per_reward_function = self._build_gae_lambda_per_reward_function()
+        self.gae_lambda_per_reward_function = (
+            self._build_gae_lambda_per_reward_function()
+        )
 
-        self.num_batches_of_envs = math.ceil(self.total_timesteps / (self.num_envs_per_batch * self.num_steps_per_env))
+        self.num_batches_of_envs = math.ceil(
+            self.total_timesteps / (self.num_envs_per_batch * self.num_steps_per_env)
+        )
         self.num_updates_per_batch = self.num_steps_per_env // self.num_steps_per_update
         if self.training_mode == "curriculum":
             self._validate_curriculum_config()
@@ -183,10 +216,10 @@ class TrainConfig:
         if self.training_mode == "curriculum" and not self.selected_intrinsic_modules:
             msg = "selected_intrinsic_modules cannot be empty for this algorithm."
             raise ValueError(msg)
-        if len(self.selected_intrinsic_modules) != len(set(self.selected_intrinsic_modules)):
-            msg = (
-                f"selected_intrinsic_modules must not contain duplicates. Received {self.selected_intrinsic_modules!r}."
-            )
+        if len(self.selected_intrinsic_modules) != len(
+            set(self.selected_intrinsic_modules)
+        ):
+            msg = f"selected_intrinsic_modules must not contain duplicates. Received {self.selected_intrinsic_modules!r}."
             raise ValueError(msg)
 
         for module_name in self.selected_intrinsic_modules:
@@ -235,7 +268,10 @@ class TrainConfig:
             if self.rnd.head_activation not in RNDConfig.SUPPORTED_HEAD_ACTIVATIONS:
                 msg = f"rnd.head_activation must be one of {RNDConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.rnd.head_activation!r}."
                 raise ValueError(msg)
-            if self.rnd.predictor_num_minibatches <= 0 or self.rnd.num_chunks_in_rewards_computation <= 0:
+            if (
+                self.rnd.predictor_num_minibatches <= 0
+                or self.rnd.num_chunks_in_rewards_computation <= 0
+            ):
                 msg = "rnd.predictor_num_minibatches and rnd.num_chunks_in_rewards_computation must be > 0."
                 raise ValueError(msg)
 
@@ -252,6 +288,41 @@ class TrainConfig:
                 )
                 raise ValueError(msg)
 
+        if "ngu" in self.selected_intrinsic_modules:
+            if self.ngu.head_activation not in NGUConfig.SUPPORTED_HEAD_ACTIVATIONS:
+                msg = f"ngu.head_activation must be one of {NGUConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.ngu.head_activation!r}."
+                raise ValueError(msg)
+            if (
+                self.ngu.embedding_num_minibatches <= 0
+                or self.ngu.num_chunks_in_rewards_computation <= 0
+                or self.ngu.episodic_memory_capacity <= 0
+                or self.ngu.num_neighbors <= 0
+            ):
+                msg = "ngu.embedding_num_minibatches, ngu.num_chunks_in_rewards_computation, ngu.episodic_memory_capacity, and ngu.num_neighbors must be > 0."
+                raise ValueError(msg)
+
+            total_steps_per_update = self.num_envs_per_batch * self.num_steps_per_update
+            if total_steps_per_update % self.ngu.embedding_num_minibatches != 0:
+                msg = f"Total collected steps per update (num_envs_per_batch * num_steps_per_update) must be divisible by ngu.embedding_num_minibatches ({self.ngu.embedding_num_minibatches})."
+                raise ValueError(msg)
+            if total_steps_per_update % self.ngu.num_chunks_in_rewards_computation != 0:
+                msg = (
+                    "Total collected steps per update "
+                    "(num_envs_per_batch * num_steps_per_update) must be divisible by "
+                    f"ngu.num_chunks_in_rewards_computation ({self.ngu.num_chunks_in_rewards_computation})."
+                )
+                raise ValueError(msg)
+            if (
+                self.episode_max_steps is not None
+                and self.ngu.episodic_memory_capacity < self.episode_max_steps
+            ):
+                msg = (
+                    f"ngu.episodic_memory_capacity ({self.ngu.episodic_memory_capacity}) "
+                    f"must be >= episode_max_steps ({self.episode_max_steps}), "
+                    "otherwise observations will be silently overwritten mid-episode."
+                )
+                raise ValueError(msg)
+
     def _apply_mode_specific_overrides(self):
         if self.training_mode == "baseline":
             # Baseline policy/value are not alpha-conditioned.
@@ -264,9 +335,14 @@ class TrainConfig:
             return self.baseline_fixed_training_alpha
 
         if self.baseline_fixed_training_alpha is None:
-            return tuple(1.0 if reward_fn_idx == 0 else 0.0 for reward_fn_idx in range(self.num_reward_functions))
+            return tuple(
+                1.0 if reward_fn_idx == 0 else 0.0
+                for reward_fn_idx in range(self.num_reward_functions)
+            )
 
-        baseline_alpha = jnp.asarray(self.baseline_fixed_training_alpha, dtype=jnp.float32)
+        baseline_alpha = jnp.asarray(
+            self.baseline_fixed_training_alpha, dtype=jnp.float32
+        )
         if baseline_alpha.ndim != 1:
             msg = (
                 "baseline_fixed_training_alpha must be a 1D tuple-like object with shape [R]. "
@@ -286,13 +362,23 @@ class TrainConfig:
             msg = "baseline_fixed_training_alpha must be non-negative."
             raise ValueError(msg)
         alpha_sum = jnp.sum(baseline_alpha)
-        if not bool(jnp.allclose(alpha_sum, jnp.array(1.0, dtype=baseline_alpha.dtype), atol=1e-6)):
-            msg = "baseline_fixed_training_alpha must sum to 1. " f"Received sum {float(alpha_sum)}."
+        if not bool(
+            jnp.allclose(
+                alpha_sum, jnp.array(1.0, dtype=baseline_alpha.dtype), atol=1e-6
+            )
+        ):
+            msg = (
+                "baseline_fixed_training_alpha must sum to 1. "
+                f"Received sum {float(alpha_sum)}."
+            )
             raise ValueError(msg)
         return tuple(self.baseline_fixed_training_alpha)
 
     def _validate_curriculum_config(self):
-        if self.curriculum.score_lp_mode not in CurriculumConfig.SUPPORTED_SCORE_LP_MODES:
+        if (
+            self.curriculum.score_lp_mode
+            not in CurriculumConfig.SUPPORTED_SCORE_LP_MODES
+        ):
             msg = f"curriculum.score_lp_mode must be one of {CurriculumConfig.SUPPORTED_SCORE_LP_MODES}. Received {self.curriculum.score_lp_mode!r}."
             raise ValueError(msg)
         if not (0.0 <= self.curriculum.score_lambda <= 1.0):
@@ -301,7 +387,10 @@ class TrainConfig:
         if self.curriculum.replay_buffer_num_batches <= 0:
             msg = f"curriculum.replay_buffer_num_batches must be > 0. Received {self.curriculum.replay_buffer_num_batches}."
             raise ValueError(msg)
-        if self.curriculum.predictor_activation not in CurriculumConfig.SUPPORTED_PREDICTOR_ACTIVATIONS:
+        if (
+            self.curriculum.predictor_activation
+            not in CurriculumConfig.SUPPORTED_PREDICTOR_ACTIVATIONS
+        ):
             msg = f"curriculum.predictor_activation must be one of {CurriculumConfig.SUPPORTED_PREDICTOR_ACTIVATIONS}. Received {self.curriculum.predictor_activation!r}."
             raise ValueError(msg)
         if (
@@ -328,7 +417,9 @@ class TrainConfig:
             )
             raise ValueError(msg)
 
-        buffer_capacity = self.curriculum.replay_buffer_num_batches * self.num_envs_per_batch
+        buffer_capacity = (
+            self.curriculum.replay_buffer_num_batches * self.num_envs_per_batch
+        )
         if buffer_capacity % self.curriculum.predictor_num_minibatches != 0:
             msg = (
                 "Total replay-buffer capacity "
@@ -345,6 +436,8 @@ class TrainConfig:
         for module_name in self.selected_intrinsic_modules:
             if module_name == "rnd":
                 gamma_values.append(self.rnd.gamma)
+            elif module_name == "ngu":
+                gamma_values.append(self.ngu.gamma)
             else:
                 msg = f"Unsupported intrinsic module {module_name!r} for gamma construction."
                 raise ValueError(msg)
@@ -371,6 +464,8 @@ class TrainConfig:
         for module_name in self.selected_intrinsic_modules:
             if module_name == "rnd":
                 gae_lambda_values.append(self.rnd.gae_lambda)
+            elif module_name == "ngu":
+                gae_lambda_values.append(self.ngu.gae_lambda)
             else:
                 msg = f"Unsupported intrinsic module {module_name!r} for gae_lambda construction."
                 raise ValueError(msg)
@@ -408,15 +503,22 @@ class TrainConfig:
     def _build_evaluation_alphas_array(self) -> jnp.ndarray:
         """Build fixed evaluation alpha matrix with shape [A, R]."""
         if self.training_mode == "baseline":
-            if self.baseline_fixed_training_alpha is None:  # pragma: no cover - __post_init__ sets this in baseline.
+            if (
+                self.baseline_fixed_training_alpha is None
+            ):  # pragma: no cover - __post_init__ sets this in baseline.
                 msg = "baseline_fixed_training_alpha must be set in baseline mode."
                 raise ValueError(msg)
-            raw_evaluation_alphas: tuple[tuple[float, ...], ...] = (self.baseline_fixed_training_alpha,)
+            raw_evaluation_alphas: tuple[tuple[float, ...], ...] = (
+                self.baseline_fixed_training_alpha,
+            )
         elif self.evaluation_alphas is None:
             extrinsic_only_alpha = tuple(
-                1.0 if reward_fn_idx == 0 else 0.0 for reward_fn_idx in range(self.num_reward_functions)
+                1.0 if reward_fn_idx == 0 else 0.0
+                for reward_fn_idx in range(self.num_reward_functions)
             )
-            raw_evaluation_alphas: tuple[tuple[float, ...], ...] = (extrinsic_only_alpha,)
+            raw_evaluation_alphas: tuple[tuple[float, ...], ...] = (
+                extrinsic_only_alpha,
+            )
         else:
             raw_evaluation_alphas = self.evaluation_alphas
 
@@ -453,14 +555,23 @@ class TrainConfig:
         reward_label_prefixes = (
             "ext",
             *(
-                "".join(character for character in module_name.lower() if character.isalnum()) or f"r{module_idx + 1}"
-                for module_idx, module_name in enumerate(self.selected_intrinsic_modules)
+                "".join(
+                    character
+                    for character in module_name.lower()
+                    if character.isalnum()
+                )
+                or f"r{module_idx + 1}"
+                for module_idx, module_name in enumerate(
+                    self.selected_intrinsic_modules
+                )
             ),
         )
         labels = []
         for alpha in self.evaluation_alphas_array:
             alpha_tokens = []
-            for reward_prefix, reward_weight in zip(reward_label_prefixes, alpha, strict=True):
+            for reward_prefix, reward_weight in zip(
+                reward_label_prefixes, alpha, strict=True
+            ):
                 decile_weight = int(round(float(reward_weight) * 10.0))
                 decile_weight = max(0, min(10, decile_weight))
                 alpha_tokens.append(f"{reward_prefix}{decile_weight:02d}")
