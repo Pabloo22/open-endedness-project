@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from crew.main_algo.curriculum.lp_estimation import estimate_lp_per_reward_function
-from crew.main_algo.types import LpEstimationData, RewardNormalizationStats
+from crew.main_algo.types import LpEstimationData
 
 
 def _ols_slope_numpy(x: np.ndarray, y: np.ndarray, eps: float) -> float:
@@ -160,17 +160,6 @@ def _debug_episodic_intermediates(
     }
 
 
-def _build_reward_stats(num_envs: int, var_per_reward: np.ndarray) -> RewardNormalizationStats:
-    num_reward_functions = var_per_reward.shape[0]
-    return RewardNormalizationStats(
-        running_forward_return=jnp.zeros((num_envs, num_reward_functions), dtype=jnp.float32),
-        count=jnp.array(1.0, dtype=jnp.float32),
-        mean=jnp.zeros((num_reward_functions,), dtype=jnp.float32),
-        M2=jnp.zeros((num_reward_functions,), dtype=jnp.float32),
-        var=jnp.asarray(var_per_reward, dtype=jnp.float32),
-    )
-
-
 class TestLpAndScoreEstimation(unittest.TestCase):
     def test_lifetime_intermediates_and_final_lp(self):
         eps = 1e-8
@@ -193,17 +182,15 @@ class TestLpAndScoreEstimation(unittest.TestCase):
         raw_rewards = jnp.asarray(rewards_ut[:, :, None, None], dtype=jnp.float32)  # [U, T, B=1, R=1]
         done_masks = jnp.zeros_like(raw_rewards, dtype=jnp.bool_)
         lp_data = LpEstimationData(raw_rewards=raw_rewards, done_masks=done_masks)
-        stats = _build_reward_stats(num_envs=1, var_per_reward=np.asarray([4.0], dtype=np.float32))
 
-        lp, single_episode_env_mask = estimate_lp_per_reward_function(
+        lp, insufficient_episodes_env_mask = estimate_lp_per_reward_function(
             lp_estimation_data=lp_data,
-            reward_normalization_stats=stats,
             is_episodic_per_reward_function=jnp.asarray([False], dtype=jnp.bool_),
             gamma_per_reward_function=jnp.asarray([gamma], dtype=jnp.float32),
             eps=eps,
         )
-        np.testing.assert_allclose(np.asarray(lp), np.asarray([[1.0]], dtype=np.float32), rtol=0, atol=1e-6)
-        np.testing.assert_array_equal(np.asarray(single_episode_env_mask), np.asarray([0], dtype=np.int32))
+        np.testing.assert_allclose(np.asarray(lp), np.asarray([[2.0]], dtype=np.float32), rtol=0, atol=1e-6)
+        np.testing.assert_array_equal(np.asarray(insufficient_episodes_env_mask), np.asarray([1], dtype=np.int32))
 
     def test_episodic_intermediates_and_final_lp(self):
         eps = 1e-8
@@ -251,18 +238,16 @@ class TestLpAndScoreEstimation(unittest.TestCase):
         raw_rewards = jnp.asarray(rewards_ut[:, :, None, None], dtype=jnp.float32)  # [U, T, B=1, R=1]
         done_masks = jnp.asarray(done_ut[:, :, None, None], dtype=jnp.bool_)
         lp_data = LpEstimationData(raw_rewards=raw_rewards, done_masks=done_masks)
-        stats = _build_reward_stats(num_envs=1, var_per_reward=np.asarray([4.0], dtype=np.float32))
 
-        lp, single_episode_env_mask = estimate_lp_per_reward_function(
+        lp, insufficient_episodes_env_mask = estimate_lp_per_reward_function(
             lp_estimation_data=lp_data,
-            reward_normalization_stats=stats,
             is_episodic_per_reward_function=jnp.asarray([True], dtype=jnp.bool_),
             gamma_per_reward_function=jnp.asarray([0.99], dtype=jnp.float32),
             eps=eps,
         )
-        expected_lp = np.asarray([[6.23076923076923 / 2.0]], dtype=np.float32)
+        expected_lp = np.asarray([[6.23076923076923]], dtype=np.float32)
         np.testing.assert_allclose(np.asarray(lp), expected_lp, rtol=0, atol=1e-6)
-        np.testing.assert_array_equal(np.asarray(single_episode_env_mask), np.asarray([0], dtype=np.int32))
+        np.testing.assert_array_equal(np.asarray(insufficient_episodes_env_mask), np.asarray([0], dtype=np.int32))
 
     def test_mixed_reward_types_dispatch_and_jit(self):
         eps = 1e-8
@@ -292,13 +277,11 @@ class TestLpAndScoreEstimation(unittest.TestCase):
             raw_rewards=jnp.asarray(raw_rewards),
             done_masks=jnp.asarray(done_masks),
         )
-        stats = _build_reward_stats(num_envs=B, var_per_reward=np.asarray([1.0, 4.0], dtype=np.float32))
         is_episodic = jnp.asarray([True, False], dtype=jnp.bool_)
         gamma = jnp.asarray([0.99, 0.5], dtype=jnp.float32)
 
-        lp, single_episode_env_mask = estimate_lp_per_reward_function(
+        lp, insufficient_episodes_env_mask = estimate_lp_per_reward_function(
             lp_estimation_data=lp_data,
-            reward_normalization_stats=stats,
             is_episodic_per_reward_function=is_episodic,
             gamma_per_reward_function=gamma,
             eps=eps,
@@ -306,53 +289,51 @@ class TestLpAndScoreEstimation(unittest.TestCase):
         expected = np.asarray(
             [
                 [1.0, 0.0],
-                [-1.0, 1.0],
+                [-1.0, 2.0],
             ],
             dtype=np.float32,
         )
         np.testing.assert_allclose(np.asarray(lp), expected, rtol=0, atol=1e-6)
-        np.testing.assert_array_equal(np.asarray(single_episode_env_mask), np.asarray([0, 0], dtype=np.int32))
+        np.testing.assert_array_equal(np.asarray(insufficient_episodes_env_mask), np.asarray([0, 0], dtype=np.int32))
 
         lp_jit = jax.jit(estimate_lp_per_reward_function)(
             lp_data,
-            stats,
             is_episodic,
             gamma,
             eps,
         )
-        lp_jit, single_episode_env_mask_jit = lp_jit
+        lp_jit, insufficient_episodes_env_mask_jit = lp_jit
         np.testing.assert_allclose(np.asarray(lp_jit), expected, rtol=0, atol=1e-6)
-        np.testing.assert_array_equal(np.asarray(single_episode_env_mask_jit), np.asarray([0, 0], dtype=np.int32))
+        np.testing.assert_array_equal(np.asarray(insufficient_episodes_env_mask_jit), np.asarray([0, 0], dtype=np.int32))
 
-    def test_single_episode_env_mask_identifies_only_single_episode_envs(self):
+    def test_insufficient_episodes_mask_marks_envs_with_fewer_than_two_episodes(self):
         eps = 1e-8
-        U, T, B, R = 3, 4, 2, 2
+        U, T, B, R = 3, 4, 3, 2
 
         raw_rewards = np.zeros((U, T, B, R), dtype=np.float32)
         done_masks = np.zeros((U, T, B, R), dtype=bool)
 
-        # Env 0 has exactly one terminal event on extrinsic stream.
-        done_masks[1, 2, 0, 0] = True
-        # Env 1 has two terminal events on extrinsic stream.
-        done_masks[0, 1, 1, 0] = True
-        done_masks[2, 3, 1, 0] = True
+        # Env 0 has zero terminal events on extrinsic stream.
+        # Env 1 has one terminal event on extrinsic stream.
+        done_masks[1, 2, 1, 0] = True
+        # Env 2 has two terminal events on extrinsic stream.
+        done_masks[0, 1, 2, 0] = True
+        done_masks[2, 3, 2, 0] = True
 
         lp_data = LpEstimationData(
             raw_rewards=jnp.asarray(raw_rewards),
             done_masks=jnp.asarray(done_masks),
         )
-        stats = _build_reward_stats(num_envs=B, var_per_reward=np.asarray([1.0, 1.0], dtype=np.float32))
         is_episodic = jnp.asarray([True, False], dtype=jnp.bool_)
         gamma = jnp.asarray([0.99, 0.99], dtype=jnp.float32)
 
-        _, single_episode_env_mask = estimate_lp_per_reward_function(
+        _, insufficient_episodes_env_mask = estimate_lp_per_reward_function(
             lp_estimation_data=lp_data,
-            reward_normalization_stats=stats,
             is_episodic_per_reward_function=is_episodic,
             gamma_per_reward_function=gamma,
             eps=eps,
         )
-        np.testing.assert_array_equal(np.asarray(single_episode_env_mask), np.asarray([1, 0], dtype=np.int32))
+        np.testing.assert_array_equal(np.asarray(insufficient_episodes_env_mask), np.asarray([1, 1, 0], dtype=np.int32))
 
 
 if __name__ == "__main__":

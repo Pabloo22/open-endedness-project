@@ -104,6 +104,7 @@ def compute_intrinsic_rewards_and_done_masks(
 
 def normalize_rewards_and_update_normalization_stats(
     rewards: jax.Array,
+    done: jax.Array,
     reward_normalization_stats: RewardNormalizationStats,
     config: Any,
 ) -> tuple[RewardNormalizationStats, jax.Array, dict[str, jax.Array]]:
@@ -111,6 +112,7 @@ def normalize_rewards_and_update_normalization_stats(
 
     Key input shapes:
     - rewards: [T, B, R]
+    - done: [T, B, R]
     - reward_normalization_stats.running_forward_return: [B, R]
     - config.gamma_per_reward_function: [R]
 
@@ -118,12 +120,17 @@ def normalize_rewards_and_update_normalization_stats(
     - updated_reward_normalization_stats: pytree with [B, R] and [R] stats
     - rewards_normalized: [T, B, R]
     """
-    new_running_forward_return, forward_returns = compute_forward_returns(
+    new_running_forward_return, new_previous_done, forward_returns = compute_forward_returns(
         reward_normalization_stats.running_forward_return,
+        reward_normalization_stats.previous_done,
         rewards,
+        done,
         config.gamma_per_reward_function,
     )
-    reward_normalization_stats = reward_normalization_stats.replace(running_forward_return=new_running_forward_return)
+    reward_normalization_stats = reward_normalization_stats.replace(
+        running_forward_return=new_running_forward_return,
+        previous_done=new_previous_done,
+    )
     reward_normalization_stats = update_reward_normalization_stats(reward_normalization_stats, forward_returns)
 
     rewards_normalized = normalize_rewards(
@@ -214,10 +221,9 @@ def step_envs(
     memories = jnp.roll(runner_state.memories, -1, axis=1).at[:, -1].set(memories_out)
 
     # Step environments
-    rng, step_rng_base = jax.random.split(rng)
-    step_rngs = jax.random.split(step_rng_base, num=config.num_envs_per_batch)
-    next_obs, env_state, reward, done, _ = jax.vmap(env.step, in_axes=(0, 0, 0, None))(
-        step_rngs,
+    rng, step_rng = jax.random.split(rng)
+    next_obs, env_state, reward, done, _ = env.step(
+        step_rng,
         runner_state.env_state,
         action,
         env_params,
@@ -311,6 +317,7 @@ def collect_data_and_update_agent(
 
     reward_normalization_stats, rewards_normalized, reward_metrics = normalize_rewards_and_update_normalization_stats(
         rewards=rewards,
+        done=done,
         reward_normalization_stats=runner_state.reward_normalization_stats,
         config=config,
     )

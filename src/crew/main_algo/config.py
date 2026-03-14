@@ -1,7 +1,7 @@
 """Configuration objects for the main algorithm training stack."""
 
-from collections.abc import Sequence
 import math
+from collections.abc import Sequence
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import ClassVar
@@ -63,6 +63,7 @@ class CurriculumConfig:
     importance_num_candidates_multiplier: int = 10
     min_batches_for_predictor_sampling: int = 1
     sampling_weights_eps: float = 1e-8
+    lp_norm_ema_beta: float = 0.05
 
     SUPPORTED_SCORE_LP_MODES: ClassVar[tuple[str, ...]] = ("alp", "lp")
     SUPPORTED_PREDICTOR_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
@@ -74,12 +75,12 @@ class TrainConfig:
     env_id: str = "Craftax-Classic-Symbolic-v1"
     achievement_ids_to_block: Sequence[int] = ()
     remove_health_reward: bool = False
-    episode_max_steps: int | None = 1000
+    episode_max_steps: int | None = 3000
     training_mode: str = "curriculum"
 
     # training
-    num_envs_per_batch: int = 2048
-    num_steps_per_env: int = 5120
+    num_envs_per_batch: int = 1024
+    num_steps_per_env: int = 4096
     num_steps_per_update: int = 256
     total_timesteps: int = 1_000_000_000
     num_batches_of_envs: int = field(init=False)
@@ -88,6 +89,7 @@ class TrainConfig:
 
     update_epochs: int = 1
     num_minibatches: int = 16
+    optimistic_reset_ratio_limit: int = 16
 
     adam_eps: float = 1e-5
     lr: float = 2e-4
@@ -95,7 +97,7 @@ class TrainConfig:
     clip_eps: float = 0.2
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    ent_coef: float = 0.005
+    ent_coef: float = 0.01
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
 
@@ -103,6 +105,7 @@ class TrainConfig:
     reward_norm_eps: float = 1e-8
     adv_norm_eps: float = 1e-8
     reward_norm_clip: float | None = None
+    reset_normalization_running_forward_return_on_new_alpha: bool = False
 
     # encoder
     obs_emb_dim: int = 256
@@ -139,7 +142,7 @@ class TrainConfig:
     icm: ICMConfig = field(default_factory=ICMConfig)
 
     # eval
-    eval_every_n_batches: int = 1
+    eval_every_n_batches: int = 2
     eval_num_envs: int = 1024
     eval_num_episodes: int = 2
     evaluation_alphas: tuple[tuple[float, ...], ...] | None = None
@@ -225,9 +228,13 @@ class TrainConfig:
             or self.num_steps_per_env <= 0
             or self.num_steps_per_update <= 0
             or self.num_minibatches <= 0
+            or self.optimistic_reset_ratio_limit <= 0
             or self.subsequence_length_in_loss_calculation <= 0
         ):
-            msg = "num_envs_per_batch, num_steps_per_env, num_steps_per_update, num_minibatches, and subsequence_length_in_loss_calculation must be > 0."
+            msg = (
+                "num_envs_per_batch, num_steps_per_env, num_steps_per_update, num_minibatches, "
+                "optimistic_reset_ratio_limit, and subsequence_length_in_loss_calculation must be > 0."
+            )
             raise ValueError(msg)
 
         if self.num_envs_per_batch % self.num_minibatches != 0:
@@ -371,6 +378,9 @@ class TrainConfig:
             raise ValueError(msg)
         if self.curriculum.min_batches_for_predictor_sampling < 0:
             msg = f"curriculum.min_batches_for_predictor_sampling must be >= 0. Received {self.curriculum.min_batches_for_predictor_sampling}."
+            raise ValueError(msg)
+        if not (0.0 < self.curriculum.lp_norm_ema_beta <= 1.0):
+            msg = "curriculum.lp_norm_ema_beta must be in (0, 1]. " f"Received {self.curriculum.lp_norm_ema_beta}."
             raise ValueError(msg)
 
         buffer_capacity = self.curriculum.replay_buffer_num_batches * self.num_envs_per_batch

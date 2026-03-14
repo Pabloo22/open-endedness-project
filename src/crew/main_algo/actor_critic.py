@@ -1,6 +1,5 @@
 """Alpha-conditioned actor-critic network for the main algorithm."""
 
-import distrax
 import flax.linen as nn
 import jax
 import jax.numpy as jnp
@@ -9,6 +8,24 @@ from flax.linen.initializers import constant, orthogonal
 
 from crew.networks.encoders import ObsEncoderFlatSymbolic
 from crew.networks.transformer_xl_base import Transformer_XL
+
+
+class Categorical:
+    """Minimal drop-in for distrax.Categorical using pure JAX."""
+
+    def __init__(self, logits: jax.Array):
+        self.logits = logits
+
+    def sample(self, seed: jax.Array) -> jax.Array:
+        return jax.random.categorical(seed, self.logits)
+
+    def log_prob(self, action: jax.Array) -> jax.Array:
+        log_probs = jax.nn.log_softmax(self.logits)
+        return jnp.take_along_axis(log_probs, action[..., jnp.newaxis], axis=-1).squeeze(-1)
+
+    def entropy(self) -> jax.Array:
+        log_probs = jax.nn.log_softmax(self.logits)
+        return -jnp.sum(jax.nn.softmax(self.logits) * log_probs, axis=-1)
 
 
 class ActorCriticTransformer(nn.Module):
@@ -85,7 +102,7 @@ class ActorCriticTransformer(nn.Module):
         observations: jax.Array,
         mask: jax.Array,
         alpha_batch: jax.Array,
-    ) -> tuple[distrax.Categorical, jax.Array]:
+    ) -> tuple[Categorical, jax.Array]:
         """Forward pass without memory cache output (eval stepping mode)."""
         # Expected shapes:
         # - observations: [B, 1, obs_dim]
@@ -107,7 +124,7 @@ class ActorCriticTransformer(nn.Module):
         actor = self.actor_linear2(actor)
         actor = self.activation_fn(actor)
         actor_logits = self.actor_out(actor)
-        pi = distrax.Categorical(logits=actor_logits)
+        pi = Categorical(logits=actor_logits)
 
         if self.inject_alpha_at_critic_head:
             critic_input = jnp.concatenate((features, alpha_batch), axis=-1)
@@ -127,7 +144,7 @@ class ActorCriticTransformer(nn.Module):
         observations: jax.Array,
         mask: jax.Array,
         alpha_batch: jax.Array,
-    ) -> tuple[distrax.Categorical, jax.Array, jax.Array]:
+    ) -> tuple[Categorical, jax.Array, jax.Array]:
         """Eval forward pass used during rollout collection."""
         # Expected shapes:
         # - observations: [B, 1, obs_dim]
@@ -149,7 +166,7 @@ class ActorCriticTransformer(nn.Module):
         actor = self.actor_linear2(actor)
         actor = self.activation_fn(actor)
         actor_logits = self.actor_out(actor)
-        pi = distrax.Categorical(logits=actor_logits)
+        pi = Categorical(logits=actor_logits)
 
         if self.inject_alpha_at_critic_head:
             critic_input = jnp.concatenate((features, alpha_batch), axis=-1)
@@ -169,7 +186,7 @@ class ActorCriticTransformer(nn.Module):
         observations: jax.Array,
         mask: jax.Array,
         alpha_batch: jax.Array,
-    ) -> tuple[distrax.Categorical, jax.Array]:
+    ) -> tuple[Categorical, jax.Array]:
         """Train forward pass used during PPO minibatch updates."""
         # Expected shapes:
         # - observations: [B, T, obs_dim]
@@ -196,7 +213,7 @@ class ActorCriticTransformer(nn.Module):
         actor = self.actor_linear2(actor)
         actor = self.activation_fn(actor)
         actor_logits = self.actor_out(actor)
-        pi = distrax.Categorical(logits=actor_logits)
+        pi = Categorical(logits=actor_logits)
 
         if self.inject_alpha_at_critic_head:
             critic_input = jnp.concatenate((features, alpha_over_time), axis=-1)

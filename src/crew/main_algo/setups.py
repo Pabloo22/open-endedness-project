@@ -9,6 +9,7 @@ from flax.training.train_state import TrainState
 
 from crew.main_algo.actor_critic import ActorCriticTransformer
 from crew.main_algo.config import TrainConfig
+from crew.main_algo.curriculum.lp_normalization import init_lp_normalization_stats
 from crew.main_algo.curriculum.replay_buffer import init_alpha_score_replay_buffer
 from crew.main_algo.curriculum.score_predictor import init_score_predictor_train_state
 from crew.main_algo.intrinsic_modules.api import IntrinsicModule
@@ -19,7 +20,18 @@ from crew.main_algo.types import (
     IntrinsicStates,
     RewardNormalizationStats,
 )
-from crew.shared_code.wrappers import AutoResetEnvWrapper, SparseCraftaxWrapper, BASIC_ACHIEVEMENT_IDS  
+from crew.main_algo.wrappers import (
+    OptimisticResetVecEnvWrapper,
+    SparseCraftaxWrapper,
+)
+
+
+def _resolve_optimistic_reset_ratio(num_envs: int, ratio_limit: int) -> int:
+    upper_bound = min(num_envs, ratio_limit)
+    for candidate in range(upper_bound, 0, -1):
+        if num_envs % candidate == 0:
+            return candidate
+    return 1
 
 
 def setup_actor_critic_train_state(
@@ -127,9 +139,13 @@ def initialize_curriculum_state(
         rng=predictor_init_rng,
         config=config,
     )
+    lp_normalization_stats = init_lp_normalization_stats(
+        num_reward_functions=config.num_reward_functions,
+    )
     curriculum_state = CurriculumState(
         alpha_score_replay_buffer=alpha_score_replay_buffer,
         score_predictor_train_state=score_predictor_train_state,
+        lp_normalization_stats=lp_normalization_stats,
         num_batches_seen=jnp.array(0, dtype=jnp.int32),
     )
     return rng, curriculum_state
@@ -160,7 +176,15 @@ def set_up_for_training(
         blocked_achievement_ids=config.achievement_ids_to_block,
         remove_health_reward=config.remove_health_reward,
     )
-    env = AutoResetEnvWrapper(base_env)
+    reset_ratio = _resolve_optimistic_reset_ratio(
+        num_envs=config.num_envs_per_batch,
+        ratio_limit=config.optimistic_reset_ratio_limit,
+    )
+    env = OptimisticResetVecEnvWrapper(
+        base_env,
+        num_envs=config.num_envs_per_batch,
+        reset_ratio=reset_ratio,
+    )
 
     # Agent setup.
     if config.anneal_lr:

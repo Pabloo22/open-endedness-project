@@ -22,7 +22,7 @@ poetry install
 ```
 or
 ```
-poetry install --with notebooks
+poetry install --with notebooks --with dev
 ```
 if you want to include the dependencies for the notebooks.
 

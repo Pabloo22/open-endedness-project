@@ -16,9 +16,6 @@ from craftax.craftax_classic.envs.craftax_symbolic_env import (
 from craftax.craftax_classic import constants as classic_craftax_constants
 
 
-BASIC_ACHIEVEMENT_IDS = list(range(25))
-
-
 class GymnaxWrapper(object):
     """Base class for Gymnax wrappers."""
 
@@ -102,17 +99,30 @@ class OptimisticResetVecEnvWrapper(GymnaxWrapper):
         rngs = jax.random.split(_rng, self.num_resets)
         obs_re, state_re = self.reset_fn(rngs, params)
 
-        rng, _rng = jax.random.split(rng)
         reset_indexes = jnp.arange(self.num_resets).repeat(self.reset_ratio)
-
-        being_reset = jax.random.choice(
-            _rng,
-            jnp.arange(self.num_envs),
-            shape=(self.num_resets,),
-            p=done,
-            replace=False,
+        rng, _rng = jax.random.split(rng)
+        reset_priority = jnp.where(
+            done,
+            jax.random.uniform(_rng, (self.num_envs,), dtype=jnp.float32),
+            -jnp.inf,
         )
-        reset_indexes = reset_indexes.at[being_reset].set(jnp.arange(self.num_resets))
+        _, prioritized_done_envs = jax.lax.top_k(reset_priority, self.num_resets)
+        prioritized_done_mask = reset_priority[prioritized_done_envs] > -jnp.inf
+
+        def assign_unique_reset(slot_idx, current_reset_indexes):
+            env_idx = prioritized_done_envs[slot_idx]
+
+            def _set_index(indexes):
+                return indexes.at[env_idx].set(jnp.asarray(slot_idx, dtype=indexes.dtype))
+
+            return jax.lax.cond(
+                prioritized_done_mask[slot_idx],
+                _set_index,
+                lambda indexes: indexes,
+                current_reset_indexes,
+            )
+
+        reset_indexes = jax.lax.fori_loop(0, self.num_resets, assign_unique_reset, reset_indexes)
 
         obs_re = obs_re[reset_indexes]
         state_re = jax.tree.map(lambda x: x[reset_indexes], state_re)

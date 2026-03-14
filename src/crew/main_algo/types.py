@@ -20,11 +20,13 @@ class RewardNormalizationStats(struct.PyTreeNode):
 
     Shapes:
     - running_forward_return: [B, R] where R = num_reward_functions
+    - previous_done: [B, R] boolean done mask from the previous step
     - mean, M2, var: [R]
     - count: scalar
     """
 
     running_forward_return: jax.Array
+    previous_done: jax.Array
     count: jax.Array
     mean: jax.Array
     M2: jax.Array
@@ -95,7 +97,21 @@ class CurriculumState(struct.PyTreeNode):
 
     alpha_score_replay_buffer: AlphaScoreReplayBuffer
     score_predictor_train_state: TrainState
+    lp_normalization_stats: "LpNormalizationStats"
     num_batches_seen: jax.Array
+
+
+class LpNormalizationStats(struct.PyTreeNode):
+    """EMA return-scale statistics used for LP normalization.
+
+    Shapes:
+    - mean, second_moment, var, initialized: [R]
+    """
+
+    mean: jax.Array
+    second_moment: jax.Array
+    var: jax.Array
+    initialized: jax.Array
 
 
 class RunnerStateBase(struct.PyTreeNode):

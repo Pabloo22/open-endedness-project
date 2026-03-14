@@ -13,6 +13,7 @@ def init_reward_normalization_stats(num_envs: int, num_reward_functions: int) ->
     """
     return RewardNormalizationStats(
         running_forward_return=jnp.zeros((num_envs, num_reward_functions), dtype=jnp.float32),
+        previous_done=jnp.zeros((num_envs, num_reward_functions), dtype=jnp.bool_),
         count=jnp.array(0.0, dtype=jnp.float32),
         mean=jnp.zeros((num_reward_functions,), dtype=jnp.float32),
         M2=jnp.zeros((num_reward_functions,), dtype=jnp.float32),
@@ -22,29 +23,40 @@ def init_reward_normalization_stats(num_envs: int, num_reward_functions: int) ->
 
 def compute_forward_returns(
     running_forward_return: jax.Array,
+    previous_done: jax.Array,
     rewards: jax.Array,
+    done: jax.Array,
     gamma: jax.Array,
-) -> tuple[jax.Array, jax.Array]:
+) -> tuple[jax.Array, jax.Array, jax.Array]:
     """Compute forward discounted returns used for reward normalization.
 
     Key input shapes:
     - running_forward_return: [B, R]
+    - previous_done: [B, R]
     - rewards: [T, B, R]
+    - done: [T, B, R]
     - gamma: [R]
 
     Key output shapes:
     - new_running_forward_return: [B, R]
+    - new_previous_done: [B, R]
     - forward_returns: [T, B, R]
     """
 
-    def scan_step(running_returns, rewards_t):
-        new_running_returns = rewards_t + gamma[None, :] * running_returns
-        return new_running_returns, new_running_returns
+    def scan_step(carry, step_inputs):
+        running_returns, previous_done_t = carry
+        rewards_t, done_t = step_inputs
 
-    new_running_forward_return, forward_returns = jax.lax.scan(
-        scan_step, running_forward_return, rewards, reverse=False
+        # Episodic streams reset on the first step after a terminal transition.
+        continuation_mask = jnp.logical_not(previous_done_t).astype(rewards_t.dtype)
+        new_running_returns = rewards_t + gamma[None, :] * running_returns * continuation_mask
+        new_carry = (new_running_returns, done_t)
+        return new_carry, new_running_returns
+
+    (new_running_forward_return, new_previous_done), forward_returns = jax.lax.scan(
+        scan_step, (running_forward_return, previous_done), (rewards, done), reverse=False
     )
-    return new_running_forward_return, forward_returns
+    return new_running_forward_return, new_previous_done, forward_returns
 
 
 def update_reward_normalization_stats(

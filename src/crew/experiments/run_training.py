@@ -94,10 +94,10 @@ if __name__ == "__main__":
         total_timesteps=100_000,
         env_id="Craftax-Classic-Symbolic-v1",
         achievement_ids_to_block=tuple(range(15)),  # Block the first n achievements for testing.
-        training_mode="baseline",  # "curriculum" or "baseline"
+        training_mode="curriculum",  # "curriculum" or "baseline"
         selected_intrinsic_modules=("rnd",),
         baseline_fixed_training_alpha=(0.8, 0.2),  # Only used in baseline mode.
-        num_envs_per_batch=64,
+        num_envs_per_batch=1024,
         num_steps_per_env=512,
         num_steps_per_update=256,
         eval_every_n_batches=2,
@@ -107,11 +107,11 @@ if __name__ == "__main__":
         update_epochs=1,
         num_minibatches=16,
         past_context_length=64,
-        subsequence_length_in_loss_calculation=64,
+        subsequence_length_in_loss_calculation=32,
         num_transformer_blocks=1,
-        transformer_hidden_states_dim=64,
-        qkv_features=64,
-        head_hidden_dim=64,
+        transformer_hidden_states_dim=128,
+        qkv_features=128,
+        head_hidden_dim=128,
         enable_wandb=True,
         is_timing_run=False,
     )
