@@ -73,6 +73,9 @@ def _build_training_batch_log_payload_curriculum(
         "ppo/entropy",
         "ppo/approx_kl",
         "intrinsic_modules/rnd/predictor_loss",
+        "intrinsic_modules/icm/loss",
+        "intrinsic_modules/icm/inverse_loss",
+        "intrinsic_modules/icm/forward_loss",
         "curriculum/pred_score_mean",
         "curriculum/predictor_loss",
         "curriculum/alpha/entropy_mean",
@@ -134,6 +137,16 @@ def _build_training_batch_log_payload_baseline(
         payload["intrinsic_modules/rnd/predictor_loss"] = jnp.asarray(
             batch_metrics["intrinsic_modules/rnd/predictor_loss"]
         ).item()
+    
+    icm_keys = (
+    "intrinsic_modules/icm/loss",
+    "intrinsic_modules/icm/inverse_loss",
+    "intrinsic_modules/icm/forward_loss",
+    )
+    for k in icm_keys:
+        if k in batch_metrics:
+            payload[k] = jnp.asarray(batch_metrics[k]).item()
+    
 
     for reward_metric_key in reward_vector_metric_keys:
         _split_reward_vector_metric(
