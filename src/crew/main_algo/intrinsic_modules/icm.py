@@ -162,7 +162,7 @@ class ICMIntrinsicModule:
         init_actions = jnp.zeros((1,), dtype=jnp.int32)
         icm_net = ICMNet(
             activation_fn=config.icm.activation_fn,
-            obs_emb_dim=config.obs_emb_dim,
+            obs_emb_dim=config.icm.obs_emb_dim,
             action_dim=ACTION_DIMS[config.env_id],
             forward_hidden_dims=config.icm.forward_hidden_dims,
             inverse_hidden_dims=config.icm.inverse_hidden_dims,

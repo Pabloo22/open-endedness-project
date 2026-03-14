@@ -35,6 +35,8 @@ class ICMConfig:
     forward_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
     inverse_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
     
+    obs_emb_dim: int = 256
+    
     # hyperparams
     lr: float = 1e-4
     reward_eta: float = 0.01
