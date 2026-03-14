@@ -4,24 +4,19 @@ import jax
 import jax.numpy as jnp
 import optax
 from flax import struct
-
-
-# not sure if this is the best way to do this but whatever
-ACTION_DIMS = {
-    "Craftax-Classic-Symbolic-v1" : 17,
-    "Craftax-Symbolic-v1" : 43
-}
-
-from flax import struct
 from flax.training.train_state import TrainState
-
-
 from crew.main_algo.types import (
     IntrinsicModulesUpdateData,
     IntrinsicUpdateMetrics,
     TransitionDataBase,
 )
 from crew.networks.encoders import ObsEncoderFlatSymbolic
+
+
+ACTION_DIMS = {
+    "Craftax-Classic-Symbolic-v1" : 17,
+    "Craftax-Symbolic-v1" : 43
+}
 
 
 class ICMModuleState(struct.PyTreeNode):
@@ -108,7 +103,6 @@ class ICMNet(nn.Module):
         Returns:
             Predicted action logits, shape (*batch_dims, action_dim).
         """
-        
         return self.inverse_net(jnp.concatenate([z, z_next], axis=-1))
     
     def init_all(
@@ -134,7 +128,6 @@ class ICMNet(nn.Module):
         
         return z_hat_next, a_hat
         
-#### MAIN INTRINSIC MODULE ###
 class ICMIntrinsicModule:
     """Intrinsic Curiosity Module for intrinsic reward."""
     
