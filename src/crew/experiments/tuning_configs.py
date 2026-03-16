@@ -121,27 +121,27 @@ GENERIC_SEARCH_SPACE_V1: dict[str, Any] = {
     # "obs_emb_dim": {"values": [128, 192, 256]},  (Fixed for now to speed up tuning runs)
     # The following params have "low" or "low/fixed" priority for searching:
     # "gamma": {"values": [0.99, 0.995, 0.999]},
-#     "update_epochs": {"values": [1, 2, 4]},
-#     "num_minibatches": {
-#         "values": [
-#             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 8),
-#             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 4),
-#             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 2),
-#         ]
-#     },
+    #     "update_epochs": {"values": [1, 2, 4]},
+    #     "num_minibatches": {
+    #         "values": [
+    #             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 8),
+    #             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 4),
+    #             _divide_or_raise_error(NUM_ENVIRONMENTS_PER_BATCH, 2),
+    #         ]
+    #     },
 
-#     "past_context_length": {"values": [64, 128]},
-#     "subsequence_length_in_loss_calculation": {"values": [32, 64]},
-#     "num_attn_heads": {"values": [4, 8]},
-#     "num_transformer_blocks": {"values": [1, 2]},
-#     "transformer_hidden_states_dim": {"values": [64, 128, 192]},
-#     "gating": {"values": [True, False]},
-#     "head_activation": {"values": ["relu", "tanh"]},
-#     "head_hidden_dim": {"values": [64, 128, 256]},
-#     "adam_eps": {"values": [1e-8, 1e-5]},
-#     "anneal_lr": {"values": [True, False]},
-#     "vf_coef": {"values": [0.25, 0.5, 1.0]},
-#     "max_grad_norm": {"values": [0.3, 0.5, 1.0]},
+    #     "past_context_length": {"values": [64, 128]},
+    #     "subsequence_length_in_loss_calculation": {"values": [32, 64]},
+    #     "num_attn_heads": {"values": [4, 8]},
+    #     "num_transformer_blocks": {"values": [1, 2]},
+    #     "transformer_hidden_states_dim": {"values": [64, 128, 192]},
+    #     "gating": {"values": [True, False]},
+    #     "head_activation": {"values": ["relu", "tanh"]},
+    #     "head_hidden_dim": {"values": [64, 128, 256]},
+    #     "adam_eps": {"values": [1e-8, 1e-5]},
+    #     "anneal_lr": {"values": [True, False]},
+    #     "vf_coef": {"values": [0.25, 0.5, 1.0]},
+    #     "max_grad_norm": {"values": [0.3, 0.5, 1.0]},
 }
 
 RND_INTRINSIC_SEARCH_SPACE_V1: dict[str, Any] = {

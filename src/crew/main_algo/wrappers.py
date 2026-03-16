@@ -1,5 +1,7 @@
 # copied from https://github.com/MichaelTMatthews/Craftax_Baselines/blob/150fd6ce26f77c37ebbd5087563f37f80f905727/wrappers.py#L83
 # We added the `SparseCraftaxWrapper` class
+# We also fixed a bug with the `OptimisticResetVecEnvWrapper` and opened an issue reporting it here:
+# https://github.com/MichaelTMatthews/Craftax_Baselines/issues/11
 
 from collections.abc import Sequence
 from functools import partial
@@ -29,9 +31,6 @@ class GymnaxWrapper(object):
 
 class AutoResetEnvWrapper(GymnaxWrapper):
     """Provides standard auto-reset functionality, providing the same behaviour as Gymnax-default."""
-
-    def __init__(self, env):
-        super().__init__(env)
 
     @partial(jax.jit, static_argnums=(0, 2))
     def reset(self, key, params=None):
