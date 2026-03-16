@@ -1,12 +1,22 @@
 from ._generic_phase import (
-    default_base_params,
+    get_default_base_params,
     get_lightweight_base_params,
     get_generic_search_space_v1,
     DEFAULT_BASELINE_INTRINSIC_ALPHA,
+    get_generic_search_space_v2,
+    get_base_params_after_generic_sweep,
 )
 from ._rnd_phase import (
     get_rnd_base_config_v1,
     get_rnd_search_space_v1,
+)
+from ._icm_phase import (
+    get_icm_base_config_v1,
+    get_icm_search_space_v1,
+)
+from ._ngu_phase import (
+    get_ngu_base_config_v1,
+    get_ngu_search_space_v1,
 )
 
 from ._curriculum_phase import (
@@ -25,11 +35,17 @@ from ._active_configs import (
 
 
 __all__ = [
-    "default_base_params",
+    "get_default_base_params",
     "get_lightweight_base_params",
     "get_generic_search_space_v1",
+    "get_generic_search_space_v2",
+    "get_base_params_after_generic_sweep",
     "get_rnd_base_config_v1",
     "get_rnd_search_space_v1",
+    "get_icm_base_config_v1",
+    "get_icm_search_space_v1",
+    "get_ngu_base_config_v1",
+    "get_ngu_search_space_v1",
     "get_generic_base_config",
     "get_generic_search_space",
     "get_intrinsic_base_config",

@@ -28,6 +28,11 @@ def init_wandb_run(config: Any) -> Any | None:
     """Initialize W&B run when enabled in config."""
     if not config.enable_wandb:
         return None
+
+    # If W&B is already initialized (e.g. by a sweep agent), just reuse it.
+    if wandb.run is not None:
+        return {"sweep_run": wandb.run}
+
     return wandb.init(
         project=config.wandb_project,
         entity=config.wandb_entity,
@@ -42,6 +47,11 @@ def finish_wandb_run(run: Any | None) -> None:
     """Finish W&B run if present."""
     if run is None:
         return
+
+    # If this run was passed down from a sweep agent, let the agent finish it.
+    if isinstance(run, dict) and "sweep_run" in run:
+        return
+
     run.finish()
 
 

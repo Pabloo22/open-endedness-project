@@ -26,8 +26,8 @@ diagnostics. Use ``--save-results`` if you also want each trial to persist the
 full checkpoint and training artifacts.
 
 Commdands run so far:
- - ``poetry run python -m crew.experiments.wandb_random_search --count 100 --tuning-phase generic``
- - ``poetry run python -m crew.experiments.wandb_random_search --tuning-phase generic --method grid``
+ - ``poetry run python -m crew.experiments.wandb_hp_search --count 100 --tuning-phase generic``
+ - ``poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid``
 """
 
 from __future__ import annotations
@@ -88,6 +88,7 @@ def main() -> None:
         group=args.group,
         train_seed=args.train_seed,
         total_timesteps=args.total_timesteps,
+        enable_inner_wandb=args.enable_inner_wandb,
     )
     fixed_overrides = parse_fixed_overrides(args.fixed_override)
     if fixed_overrides:
@@ -226,6 +227,11 @@ def parse_args() -> argparse.Namespace:
             "--fixed-override baseline_fixed_training_alpha='[0.8, 0.2]'."
         ),
     )
+    parser.add_argument(
+        "--enable-inner-wandb",
+        action="store_true",
+        help="Enable full W&B logging for the inner training runs. Disabled by default to avoid nested runs.",
+    )
     return parser.parse_args()
 
 
@@ -237,19 +243,21 @@ def build_base_tuning_config(
     group: str | None,
     train_seed: int,
     total_timesteps: int,
+    enable_inner_wandb: bool = False,
     project: str = "openendedness-2026",
 ) -> TrainConfig:
     """Build the fixed base training config used as the starting point for every trial."""
     shared_runtime_kwargs = {
         "train_seed": train_seed,
         "total_timesteps": total_timesteps,
+        "enable_wandb": enable_inner_wandb,
         "wandb_project": project,
         "wandb_entity": entity,
         "wandb_group": group,
     }
 
     if tuning_phase == TUNING_PHASE_GENERIC:
-        return TrainConfig(**cast(Any, {**shared_runtime_kwargs, **get_generic_base_config()}))
+        return TrainConfig(**cast(Any, {**get_generic_base_config(), **shared_runtime_kwargs}))
 
     if tuning_phase == TUNING_PHASE_INTRINSIC:
         intrinsic_module = _require_single_intrinsic_module(tuning_phase, intrinsic_modules)
@@ -257,8 +265,8 @@ def build_base_tuning_config(
             **cast(
                 Any,
                 {
-                    **shared_runtime_kwargs,
                     **get_intrinsic_base_config(intrinsic_module),
+                    **shared_runtime_kwargs,
                 },
             )
         )
@@ -268,8 +276,8 @@ def build_base_tuning_config(
             **cast(
                 Any,
                 {
-                    **shared_runtime_kwargs,
                     **get_curriculum_base_config_for_modules(_require_intrinsic_modules(intrinsic_modules)),
+                    **shared_runtime_kwargs,
                 },
             )
         )
