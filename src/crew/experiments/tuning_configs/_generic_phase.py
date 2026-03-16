@@ -83,5 +83,5 @@ def get_generic_search_space_v2() -> dict[str, Any]:
     return {
         "lr": {"values": [4e-4, 0.0005, 0.0007, 0.0009]},
         "ent_coef": {"values": [0.005, 0.01]},
-        "training_seed": {"values": [1, 2, 3, 4, 5]},
+        "train_seed": {"values": [1, 2, 3, 4, 5]},
     }
