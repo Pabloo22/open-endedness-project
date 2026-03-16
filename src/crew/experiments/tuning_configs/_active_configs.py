@@ -33,6 +33,7 @@ def _build_curriculum_placeholder_base_config(module_names: tuple[str, ...]) -> 
     mixed_alpha = (extrinsic_weight, *(equal_intrinsic_weight for _ in module_names))
     extrinsic_only_alpha = tuple(1.0 if idx == 0 else 0.0 for idx in range(num_rewards))
     return {
+        **ACTIVE_GENERIC_BASE_CONFIG,
         "training_mode": "curriculum",
         "selected_intrinsic_modules": module_names,
         "evaluation_alphas": (mixed_alpha, extrinsic_only_alpha),
