@@ -24,6 +24,10 @@ final summary, including the main sweep objective
 ``tuning/objective_eval_return_mean`` and several final training and evaluation
 diagnostics. Use ``--save-results`` if you also want each trial to persist the
 full checkpoint and training artifacts.
+
+Commdands run so far:
+ - ``poetry run python -m crew.experiments.wandb_random_search --count 100 --tuning-phase generic``
+ - ``poetry run python -m crew.experiments.wandb_random_search --tuning-phase generic --method grid``
 """
 
 from __future__ import annotations
@@ -67,6 +71,10 @@ SUPPORTED_TUNING_PHASES = (
     TUNING_PHASE_CURRICULUM,
 )
 
+SWEEP_METHOD_RANDOM = "random"
+SWEEP_METHOD_GRID = "grid"
+SUPPORTED_SWEEP_METHODS = (SWEEP_METHOD_RANDOM, SWEEP_METHOD_GRID)
+
 
 def main() -> None:
     """Create or reuse a W&B sweep and launch the requested number of trials."""
@@ -88,6 +96,7 @@ def main() -> None:
     sweep_config = build_default_sweep_config(
         tuning_phase=args.tuning_phase,
         intrinsic_modules=intrinsic_modules,
+        method=args.method,
     )
 
     sweep_id = args.sweep_id
@@ -99,10 +108,11 @@ def main() -> None:
     else:
         print(f"Using existing W&B sweep: {sweep_id}")
 
+    count = None if args.method == SWEEP_METHOD_GRID else args.count
     wandb.agent(
         sweep_id,
         function=lambda: run_single_trial(base_config=base_config, save_results=args.save_results),
-        count=args.count,
+        count=count,
         project=args.project,
         entity=args.entity,
     )
@@ -113,12 +123,22 @@ def build_default_sweep_config(
     tuning_phase: str,
     intrinsic_modules: tuple[str, ...] = DEFAULT_INTRINSIC_MODULES,
     objective_metric: str = DEFAULT_OBJECTIVE_METRIC,
+    method: str = SWEEP_METHOD_RANDOM,
 ) -> dict[str, Any]:
-    """Return the default W&B random-search sweep definition for the selected tuning phase."""
+    """Return the default W&B sweep definition for the selected tuning phase.
+
+    Args:
+        method: W&B sweep method. Either ``"random"`` (default) or ``"grid"``.
+            Grid search requires all search-space parameters to use ``values``
+            rather than continuous ranges.
+    """
+    if method not in SUPPORTED_SWEEP_METHODS:
+        msg = f"Unsupported sweep method {method!r}. Expected one of {SUPPORTED_SWEEP_METHODS}."
+        raise ValueError(msg)
     parameters = build_phase_search_space(tuning_phase=tuning_phase, intrinsic_modules=intrinsic_modules)
 
     return {
-        "method": "random",
+        "method": method,
         "metric": {"name": objective_metric, "goal": "maximize"},
         "parameters": parameters,
     }
@@ -187,6 +207,12 @@ def parse_args() -> argparse.Namespace:
         "--save-results",
         action="store_true",
         help="Persist the full checkpoint/result artifact for each trial.",
+    )
+    parser.add_argument(
+        "--method",
+        choices=list(SUPPORTED_SWEEP_METHODS),
+        default=SWEEP_METHOD_RANDOM,
+        help="W&B sweep search method. Use 'grid' for an exhaustive grid search over discrete 'values' parameters.",
     )
     parser.add_argument(
         "--fixed-override",
