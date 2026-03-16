@@ -63,7 +63,7 @@ def get_lightweight_base_params() -> dict[str, Any]:
 
 def get_base_params_after_generic_sweep():
     return {
-        **get_base_params_after_generic_sweep(),
+        **get_default_base_params(),
         "clip_eps": 0.2,
         "gae_lambda": 0.95,
         "ent_coef": 0.01,
