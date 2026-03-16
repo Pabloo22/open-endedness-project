@@ -1,10 +1,10 @@
 # Hyperparameter Tuning Guide
 
-This guide documents the current workflow used by `src/crew/experiments/wandb_random_search.py` and the `src/crew/experiments/tuning_configs/` package.
+This guide documents the current workflow used by `src/crew/experiments/wandb_hp_search.py` and the `src/crew/experiments/tuning_configs/` package.
 
 ## 1) What this script does
 
-`wandb_random_search.py` wraps the training entrypoint (`run_main_algo_training`) in a W&B sweep agent.
+`wandb_hp_search.py` wraps the training entrypoint (`run_main_algo_training`) in a W&B sweep agent.
 
 For each trial it:
 - Starts from a **base** `TrainConfig` (depends on `--tuning-phase`).
@@ -22,7 +22,7 @@ Important implementation detail: base tuning presets set `enable_wandb=False`, s
 Create + run random search (100 trials):
 
 ```bash
-poetry run python -m crew.experiments.wandb_random_search \
+poetry run python -m crew.experiments.wandb_hp_search \
   --tuning-phase generic \
   --count 100
 ```
@@ -30,7 +30,7 @@ poetry run python -m crew.experiments.wandb_random_search \
 Create sweep only (no agent/trials):
 
 ```bash
-poetry run python -m crew.experiments.wandb_random_search \
+poetry run python -m crew.experiments.wandb_hp_search \
   --tuning-phase intrinsic \
   --intrinsic-modules rnd \
   --create-only
@@ -39,7 +39,7 @@ poetry run python -m crew.experiments.wandb_random_search \
 Reuse an existing sweep id:
 
 ```bash
-poetry run python -m crew.experiments.wandb_random_search \
+poetry run python -m crew.experiments.wandb_hp_search \
   --tuning-phase curriculum \
   --intrinsic-modules rnd \
   --sweep-id <entity/project/sweep_id>
@@ -48,7 +48,7 @@ poetry run python -m crew.experiments.wandb_random_search \
 Run grid search:
 
 ```bash
-poetry run python -m crew.experiments.wandb_random_search \
+poetry run python -m crew.experiments.wandb_hp_search \
   --tuning-phase generic \
   --method grid
 ```
@@ -56,7 +56,7 @@ poetry run python -m crew.experiments.wandb_random_search \
 With fixed overrides before sweep sampling:
 
 ```bash
-poetry run python -m crew.experiments.wandb_random_search \
+poetry run python -m crew.experiments.wandb_hp_search \
   --tuning-phase intrinsic \
   --intrinsic-modules rnd \
   --fixed-override num_envs_per_batch=512 \
@@ -153,7 +153,7 @@ Once module is registered and active configs are wired:
 - Intrinsic phase:
 
 ```bash
-poetry run python -m crew.experiments.wandb_random_search \
+poetry run python -m crew.experiments.wandb_hp_search \
   --tuning-phase intrinsic \
   --intrinsic-modules icm
 ```
@@ -161,14 +161,14 @@ poetry run python -m crew.experiments.wandb_random_search \
 - Curriculum with multiple modules:
 
 ```bash
-poetry run python -m crew.experiments.wandb_random_search \
+poetry run python -m crew.experiments.wandb_hp_search \
   --tuning-phase curriculum \
   --intrinsic-modules rnd icm
 ```
 
 ---
 
-## 6) `wandb_random_search.py` argparse parameters
+## 6) `wandb_hp_search.py` argparse parameters
 
 | Arg | Type | Default | Required | Meaning / notes |
 |---|---|---:|---|---|
