@@ -7,6 +7,8 @@ from crew.experiments import tuning_configs
 from crew.experiments.wandb_random_search import (
     DEFAULT_OBJECTIVE_METRIC,
     DEFAULT_BASELINE_INTRINSIC_ALPHA,
+    SWEEP_METHOD_GRID,
+    SWEEP_METHOD_RANDOM,
     TUNING_PHASE_CURRICULUM,
     TUNING_PHASE_GENERIC,
     TUNING_PHASE_INTRINSIC,
@@ -90,12 +92,25 @@ class TestWandbRandomSearch(unittest.TestCase):
     def test_build_default_sweep_config_curriculum_phase_uses_only_curriculum_params(self):
         sweep_config = build_default_sweep_config(tuning_phase=TUNING_PHASE_CURRICULUM, intrinsic_modules=("rnd",))
 
-        self.assertEqual(sweep_config["method"], "random")
+        self.assertEqual(sweep_config["method"], SWEEP_METHOD_RANDOM)
         self.assertEqual(sweep_config["metric"]["name"], DEFAULT_OBJECTIVE_METRIC)
         self.assertEqual(sweep_config["metric"]["goal"], "maximize")
         self.assertIn("curriculum.score_lambda", sweep_config["parameters"])
         self.assertNotIn("rnd.predictor_network_lr", sweep_config["parameters"])
         self.assertNotIn("lr", sweep_config["parameters"])
+
+    def test_build_default_sweep_config_grid_method_is_reflected_in_config(self):
+        sweep_config = build_default_sweep_config(
+            tuning_phase=TUNING_PHASE_CURRICULUM,
+            intrinsic_modules=("rnd",),
+            method=SWEEP_METHOD_GRID,
+        )
+
+        self.assertEqual(sweep_config["method"], SWEEP_METHOD_GRID)
+
+    def test_build_default_sweep_config_raises_on_unsupported_method(self):
+        with self.assertRaises(ValueError):
+            build_default_sweep_config(tuning_phase=TUNING_PHASE_GENERIC, method="bayes")
 
     def test_build_default_sweep_config_generic_phase_uses_only_shared_params(self):
         sweep_config = build_default_sweep_config(tuning_phase=TUNING_PHASE_GENERIC)
