@@ -3,6 +3,8 @@ from ._generic_phase import (
     get_lightweight_base_params,
     get_generic_search_space_v1,
     DEFAULT_BASELINE_INTRINSIC_ALPHA,
+    get_generic_search_space_v2,
+    get_base_params_after_generic_sweep,
 )
 from ._rnd_phase import (
     get_rnd_base_config_v1,
@@ -36,6 +38,8 @@ __all__ = [
     "get_default_base_params",
     "get_lightweight_base_params",
     "get_generic_search_space_v1",
+    "get_generic_search_space_v2",
+    "get_base_params_after_generic_sweep",
     "get_rnd_base_config_v1",
     "get_rnd_search_space_v1",
     "get_icm_base_config_v1",

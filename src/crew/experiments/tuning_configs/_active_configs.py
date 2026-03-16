@@ -2,8 +2,8 @@ import copy
 from typing import Any
 
 from crew.experiments.tuning_configs import (
-    get_lightweight_base_params,
-    get_generic_search_space_v1,
+    get_base_params_after_generic_sweep,
+    get_generic_search_space_v2,
     get_rnd_base_config_v1,
     get_rnd_search_space_v1,
     get_icm_base_config_v1,
@@ -14,8 +14,8 @@ from crew.experiments.tuning_configs import (
 )
 
 
-ACTIVE_GENERIC_BASE_CONFIG = get_lightweight_base_params()
-ACTIVE_GENERIC_SEARCH_SPACE = get_generic_search_space_v1()
+ACTIVE_GENERIC_BASE_CONFIG = get_base_params_after_generic_sweep()
+ACTIVE_GENERIC_SEARCH_SPACE = get_generic_search_space_v2()
 
 ACTIVE_RND_BASE_CONFIG = get_rnd_base_config_v1()
 ACTIVE_ICM_BASE_CONFIG = get_icm_base_config_v1()

@@ -64,7 +64,7 @@ def get_lightweight_base_params() -> dict[str, Any]:
 def get_base_params_after_generic_sweep():
     return {
         **get_base_params_after_generic_sweep(),
-        "clip_eps": 0.225,
+        "clip_eps": 0.2,
         "gae_lambda": 0.95,
         "ent_coef": 0.01,
     }
@@ -81,6 +81,7 @@ def get_generic_search_space_v1() -> dict[str, Any]:
 
 def get_generic_search_space_v2() -> dict[str, Any]:
     return {
-        "lr": {"values": [4e-4, 5e-4, 6e-4, 1e-3]},
+        "lr": {"values": [4e-4, 0.0005, 0.0007, 0.0009]},
+        "ent_coef": {"values": [0.005, 0.01]},
         "training_seed": {"values": [1, 2, 3, 4, 5]},
     }
