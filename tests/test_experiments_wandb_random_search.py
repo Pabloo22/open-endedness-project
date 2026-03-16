@@ -4,7 +4,7 @@ from unittest.mock import patch
 import numpy as np
 
 from crew.experiments import tuning_configs
-from crew.experiments.wandb_random_search import (
+from crew.experiments.wandb_hp_search import (
     DEFAULT_OBJECTIVE_METRIC,
     DEFAULT_BASELINE_INTRINSIC_ALPHA,
     SWEEP_METHOD_GRID,
