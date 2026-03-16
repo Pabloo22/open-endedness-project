@@ -26,8 +26,8 @@ diagnostics. Use ``--save-results`` if you also want each trial to persist the
 full checkpoint and training artifacts.
 
 Commdands run so far:
- - ``poetry run python -m crew.experiments.wandb_random_search --count 100 --tuning-phase generic``
- - ``poetry run python -m crew.experiments.wandb_random_search --tuning-phase generic --method grid``
+ - ``poetry run python -m crew.experiments.wandb_hp_search --count 100 --tuning-phase generic``
+ - ``poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid``
 """
 
 from __future__ import annotations
