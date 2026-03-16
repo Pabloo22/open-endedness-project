@@ -1,5 +1,5 @@
 from ._generic_phase import (
-    default_base_params,
+    get_default_base_params,
     get_lightweight_base_params,
     get_generic_search_space_v1,
     DEFAULT_BASELINE_INTRINSIC_ALPHA,
@@ -33,7 +33,7 @@ from ._active_configs import (
 
 
 __all__ = [
-    "default_base_params",
+    "get_default_base_params",
     "get_lightweight_base_params",
     "get_generic_search_space_v1",
     "get_rnd_base_config_v1",

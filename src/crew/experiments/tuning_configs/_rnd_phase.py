@@ -8,7 +8,7 @@ the previous tuning states remain available for reference. Update the
 from __future__ import annotations
 from typing import Any
 
-from crew.experiments.tuning_configs import default_base_params
+from crew.experiments.tuning_configs import get_default_base_params
 
 
 DEFAULT_BASELINE_INTRINSIC_ALPHA = 0.2
@@ -16,7 +16,7 @@ NUM_ENVIRONMENTS_PER_BATCH = 1024  # Adapted for 16GB GPU memory
 DEFAULT_INTRINSIC_MODULES = ("rnd",)
 
 RND_INTRINSIC_BASE_CONFIG_V1: dict[str, Any] = {
-    **default_base_params(),
+    **get_default_base_params(),
     "selected_intrinsic_modules": ("rnd",),
     "baseline_fixed_training_alpha": (
         1.0 - DEFAULT_BASELINE_INTRINSIC_ALPHA,

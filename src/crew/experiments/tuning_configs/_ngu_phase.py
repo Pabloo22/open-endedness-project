@@ -9,14 +9,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from crew.experiments.tuning_configs import default_base_params
+from crew.experiments.tuning_configs import get_default_base_params
 
 
 DEFAULT_BASELINE_INTRINSIC_ALPHA = 0.2
 DEFAULT_INTRINSIC_MODULES = ("ngu",)
 
 NGU_INTRINSIC_BASE_CONFIG_V1: dict[str, Any] = {
-    **default_base_params(),
+    **get_default_base_params(),
     "selected_intrinsic_modules": ("ngu",),
     "baseline_fixed_training_alpha": (
         1.0 - DEFAULT_BASELINE_INTRINSIC_ALPHA,
