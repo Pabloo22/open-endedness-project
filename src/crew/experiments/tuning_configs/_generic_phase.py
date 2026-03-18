@@ -70,6 +70,16 @@ def get_base_params_after_generic_sweep():
     }
 
 
+def get_best_generic_params() -> dict[str, Any]:
+    return {
+        **get_default_base_params(),
+        "clip_eps": 0.2,
+        "gae_lambda": 0.95,
+        "ent_coef": 0.005,
+        "lr": 0.0005,
+    }
+
+
 def get_generic_search_space_v1() -> dict[str, Any]:
     return {
         "lr": {"values": [5e-5, 1e-4, 2e-4, 3e-4, 4e-4, 5e-4]},

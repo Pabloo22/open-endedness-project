@@ -2,7 +2,7 @@ import copy
 from typing import Any
 
 from crew.experiments.tuning_configs import (
-    get_base_params_after_generic_sweep,
+    get_best_generic_params,
     get_generic_search_space_v2,
     get_rnd_base_config_v1,
     get_rnd_search_space_v1,
@@ -14,7 +14,7 @@ from crew.experiments.tuning_configs import (
 )
 
 
-ACTIVE_GENERIC_BASE_CONFIG = get_base_params_after_generic_sweep()
+ACTIVE_GENERIC_BASE_CONFIG = get_best_generic_params()
 ACTIVE_GENERIC_SEARCH_SPACE = get_generic_search_space_v2()
 
 ACTIVE_RND_BASE_CONFIG = get_rnd_base_config_v1()
