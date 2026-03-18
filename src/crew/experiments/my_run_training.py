@@ -88,15 +88,16 @@ def run_main_algo_training(config: TrainConfig, save_results: bool = True) -> di
 
 
 if __name__ == "__main__":
-    # Smoke-friendly local run configuration.
+    # NGU sanity check — short run with W&B to verify plots.
+    # Expected: ngu/embedding_loss ≈ 0.0 (frozen), eval/returns > 0, no NaN.
     config = TrainConfig(
         train_seed=1,
-        total_timesteps=100_000,
+        total_timesteps=500_000,
         env_id="Craftax-Classic-Symbolic-v1",
         achievement_ids_to_block=tuple(range(15)),  # Block the first n achievements for testing.
-        training_mode="baseline",  # "curriculum" or "baseline"
-        selected_intrinsic_modules=("rnd", "ngu"),
-        baseline_fixed_training_alpha=(0.4, 0.4, 0.2),  # Only used in baseline mode.
+        training_mode="baseline",
+        selected_intrinsic_modules=("ngu",),
+        baseline_fixed_training_alpha=(0.8, 0.2),
         num_envs_per_batch=64,
         num_steps_per_env=512,
         num_steps_per_update=256,
@@ -112,7 +113,8 @@ if __name__ == "__main__":
         transformer_hidden_states_dim=64,
         qkv_features=64,
         head_hidden_dim=64,
-        enable_wandb=False,
+        enable_wandb=True,
+        wandb_tags=("ngu-sanity-check",),
         is_timing_run=False,
     )
     run_main_algo_training(config=config, save_results=False)
