@@ -70,10 +70,10 @@ ACTIVE_CURRICULUM_BASE_CONFIGS: dict[tuple[str, ...], dict[str, Any]] = {
     ("rnd",): _build_curriculum_placeholder_base_config(("rnd",)),
     ("icm",): _build_curriculum_placeholder_base_config(("icm",)),
     ("ngu",): _build_curriculum_placeholder_base_config(("ngu",)),
-    ("icm", "rnd"): _build_curriculum_placeholder_base_config(("rnd", "icm")),
-    ("ngu", "rnd"): _build_curriculum_placeholder_base_config(("rnd", "ngu")),
+    ("icm", "rnd"): _build_curriculum_placeholder_base_config(("icm", "rnd")),
+    ("ngu", "rnd"): _build_curriculum_placeholder_base_config(("ngu", "rnd")),
     ("icm", "ngu"): _build_curriculum_placeholder_base_config(("icm", "ngu")),
-    ("icm", "ngu", "rnd"): _build_curriculum_placeholder_base_config(("rnd", "icm", "ngu")),
+    ("icm", "ngu", "rnd"): _build_curriculum_placeholder_base_config(("icm", "ngu", "rnd")),
 }
 ACTIVE_CURRICULUM_SEARCH_SPACE = get_curriculum_search_space_v1()
 
