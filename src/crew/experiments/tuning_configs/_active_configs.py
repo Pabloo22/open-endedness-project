@@ -46,7 +46,6 @@ def _build_curriculum_placeholder_base_config(module_names: tuple[str, ...]) -> 
     equal_alpha = 1.0 / num_rewards
     mixed_alpha = tuple(equal_alpha for _ in range(num_rewards))
     extrinsic_only_alpha = tuple(1.0 if idx == 0 else 0.0 for idx in range(num_rewards))
-    extrinsic_only_alpha = tuple(1.0 if idx == 0 else 0.0 for idx in range(num_rewards))
     return {
         **ACTIVE_GENERIC_BASE_CONFIG,
         "training_mode": "curriculum",
