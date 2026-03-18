@@ -6,6 +6,7 @@ from ._generic_phase import (
     get_generic_search_space_v2,
     get_base_params_after_generic_sweep,
     get_best_generic_params,
+    get_best_lightweight_generic_params,
 )
 from ._rnd_phase import (
     get_rnd_base_config_v1,
@@ -42,6 +43,7 @@ __all__ = [
     "get_generic_search_space_v2",
     "get_base_params_after_generic_sweep",
     "get_best_generic_params",
+    "get_best_lightweight_generic_params",
     "get_rnd_base_config_v1",
     "get_rnd_search_space_v1",
     "get_icm_base_config_v1",

@@ -26,8 +26,13 @@ diagnostics. Use ``--save-results`` if you also want each trial to persist the
 full checkpoint and training artifacts.
 
 Commdands run so far:
- - ``poetry run python -m crew.experiments.wandb_hp_search --count 100 --tuning-phase generic``
- - ``poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid``
+
+poetry run python -m crew.experiments.wandb_hp_search --count 100 --tuning-phase generic``
+
+poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid --enable-inner-wandb
+
+nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
+    --enable-inner-wandb --count 100 >& nohup.out &
 """
 
 from __future__ import annotations
@@ -257,33 +262,25 @@ def build_base_tuning_config(
     }
 
     if tuning_phase == TUNING_PHASE_GENERIC:
-        return TrainConfig(**cast(Any, {**get_generic_base_config(), **shared_runtime_kwargs}))
-
-    if tuning_phase == TUNING_PHASE_INTRINSIC:
+        base_dict = get_generic_base_config()
+    elif tuning_phase == TUNING_PHASE_INTRINSIC:
         intrinsic_module = _require_single_intrinsic_module(tuning_phase, intrinsic_modules)
-        return TrainConfig(
-            **cast(
-                Any,
-                {
-                    **get_intrinsic_base_config(intrinsic_module),
-                    **shared_runtime_kwargs,
-                },
-            )
-        )
+        base_dict = get_intrinsic_base_config(intrinsic_module)
+    elif tuning_phase == TUNING_PHASE_CURRICULUM:
+        base_dict = get_curriculum_base_config_for_modules(_require_intrinsic_modules(intrinsic_modules))
+    else:
+        msg = f"Unsupported tuning phase {tuning_phase!r}. Expected one of {SUPPORTED_TUNING_PHASES}."
+        raise ValueError(msg)
 
-    if tuning_phase == TUNING_PHASE_CURRICULUM:
-        return TrainConfig(
-            **cast(
-                Any,
-                {
-                    **get_curriculum_base_config_for_modules(_require_intrinsic_modules(intrinsic_modules)),
-                    **shared_runtime_kwargs,
-                },
-            )
-        )
+    raw_config = {**base_dict, **shared_runtime_kwargs}
+    flat_kwargs = {k: v for k, v in raw_config.items() if "." not in k}
+    dot_kwargs = {k: v for k, v in raw_config.items() if "." in k}
 
-    msg = f"Unsupported tuning phase {tuning_phase!r}. Expected one of {SUPPORTED_TUNING_PHASES}."
-    raise ValueError(msg)
+    config = TrainConfig(**flat_kwargs)
+    for dotted_path, value in dot_kwargs.items():
+        _set_nested_attr(config, dotted_path, value)
+
+    return TrainConfig(**_dataclass_init_kwargs(config))
 
 
 def parse_fixed_overrides(raw_overrides: list[str]) -> dict[str, Any]:
