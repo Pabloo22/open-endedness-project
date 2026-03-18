@@ -1,6 +1,6 @@
 import unittest
-from types import SimpleNamespace
 from pathlib import Path
+from types import SimpleNamespace
 
 from crew.experiments.paths import build_best_weights_rollouts_path, build_trained_weights_path
 
@@ -10,7 +10,7 @@ class TestExperimentPaths(unittest.TestCase):
         config = SimpleNamespace(
             training_mode="curriculum",
             env_id="Craftax-Classic-Symbolic-v1",
-            selected_intrinsic_modules=("rnd", "icm"),
+            selected_intrinsic_modules=("rnd", "icm", "ngu"),
             train_seed=7,
             artifacts_root="/tmp/artifacts",
         )
@@ -18,7 +18,7 @@ class TestExperimentPaths(unittest.TestCase):
 
         expected = (
             Path("/tmp/artifacts").resolve()
-            / "Craftax-Classic-Symbolic-v1/training_results/curriculum/rnd+icm/seed7"
+            / "Craftax-Classic-Symbolic-v1/training_results/curriculum/rnd+icm+ngu/seed7"
         )
         self.assertEqual(path, expected)
 

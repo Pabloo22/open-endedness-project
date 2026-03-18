@@ -1,12 +1,15 @@
 """Registry for intrinsic reward modules."""
 
 from crew.main_algo.intrinsic_modules.api import IntrinsicModule
+
+from crew.main_algo.intrinsic_modules.ngu import NGUIntrinsicModule
 from crew.main_algo.intrinsic_modules.rnd import RNDIntrinsicModule
 from crew.main_algo.intrinsic_modules.icm import ICMIntrinsicModule
 
 _REGISTRY: dict[str, IntrinsicModule] = {
     "rnd": RNDIntrinsicModule(),
     "icm": ICMIntrinsicModule(),
+    "ngu": NGUIntrinsicModule(),
 }
 
 
