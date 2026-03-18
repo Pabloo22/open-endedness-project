@@ -118,10 +118,11 @@ def main() -> None:
     else:
         print(f"Using existing W&B sweep: {sweep_id}")
 
+    wandb_tags = tuple(args.wandb_tags)
     count = None if args.method == SWEEP_METHOD_GRID else args.count
     wandb.agent(
         sweep_id,
-        function=lambda: run_single_trial(base_config=base_config, save_results=args.save_results),
+        function=lambda: run_single_trial(base_config=base_config, save_results=args.save_results, tags=wandb_tags),
         count=count,
         project=args.project,
         entity=args.entity,
@@ -240,6 +241,13 @@ def parse_args() -> argparse.Namespace:
         "--enable-inner-wandb",
         action="store_true",
         help="Enable full W&B logging for the inner training runs. Disabled by default to avoid nested runs.",
+    )
+    parser.add_argument(
+        "--wandb-tags",
+        nargs="+",
+        default=[],
+        metavar="TAG",
+        help="Tags to attach to each W&B sweep run, for example --wandb-tags ngu-sweep v2.",
     )
     return parser.parse_args()
 
@@ -370,6 +378,10 @@ def extract_trial_summary(train_info: dict[str, Any]) -> dict[str, Any]:
         summary["tuning/final_rnd_predictor_loss"] = float(
             _last_scalar_metric(metrics["intrinsic_modules/rnd/predictor_loss"])
         )
+    if "intrinsic_modules/ngu/embedding_loss" in metrics:
+        summary["tuning/final_ngu_embedding_loss"] = float(
+            _last_scalar_metric(metrics["intrinsic_modules/ngu/embedding_loss"])
+        )
 
     return summary
 
@@ -434,9 +446,9 @@ def _serialize_for_wandb(value: Any) -> Any:
     return value
 
 
-def run_single_trial(base_config: TrainConfig, save_results: bool) -> None:
+def run_single_trial(base_config: TrainConfig, save_results: bool, tags: tuple[str, ...] = ()) -> None:
     """Execute one sweep trial from sampled W&B overrides through final summary logging."""
-    run = wandb.init()
+    run = wandb.init(tags=list(tags) if tags else None)
     if run is None:
         raise RuntimeError("wandb.init() did not return a run.")
 
