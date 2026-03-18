@@ -9,33 +9,11 @@ from __future__ import annotations
 
 from typing import Any
 
-from crew.experiments.tuning_configs import get_default_base_params
-
-
-DEFAULT_BASELINE_INTRINSIC_ALPHA = 0.2
-DEFAULT_INTRINSIC_MODULES = ("ngu",)
-
-NGU_INTRINSIC_BASE_CONFIG_V1: dict[str, Any] = {
-    **get_default_base_params(),
-    "selected_intrinsic_modules": ("ngu",),
-    "baseline_fixed_training_alpha": (
-        1.0 - DEFAULT_BASELINE_INTRINSIC_ALPHA,
-        DEFAULT_BASELINE_INTRINSIC_ALPHA,
-    ),
-}
-
 
 def get_ngu_base_config_v1() -> dict[str, Any]:
-    return {
-        "selected_intrinsic_modules": ("ngu",),
-        "baseline_fixed_training_alpha": (
-            1.0 - DEFAULT_BASELINE_INTRINSIC_ALPHA,
-            DEFAULT_BASELINE_INTRINSIC_ALPHA,
-        ),
-    }
+    """Returns the specific hyperparameter values for the NGU module"""
+    return {}
 
 
 def get_ngu_search_space_v1() -> dict[str, Any]:
-    return {
-        "baseline_fixed_training_alpha": {"values": [(0.9, 0.1), (0.8, 0.2), (0.7, 0.3)]},
-    }
+    return {}

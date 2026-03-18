@@ -3,6 +3,7 @@ from typing import Any
 
 from crew.experiments.tuning_configs import (
     get_best_generic_params,
+    get_best_lightweight_generic_params,
     get_generic_search_space_v2,
     get_rnd_base_config_v1,
     get_rnd_search_space_v1,
@@ -12,9 +13,10 @@ from crew.experiments.tuning_configs import (
     get_ngu_search_space_v1,
     get_curriculum_search_space_v1,
 )
+from crew.experiments.tuning_configs._generic_phase import DEFAULT_BASELINE_INTRINSIC_ALPHA
 
 
-ACTIVE_GENERIC_BASE_CONFIG = get_best_generic_params()
+ACTIVE_GENERIC_BASE_CONFIG = get_best_lightweight_generic_params()  # For a bigger network use get_best_generic_params()
 ACTIVE_GENERIC_SEARCH_SPACE = get_generic_search_space_v2()
 
 ACTIVE_RND_BASE_CONFIG = get_rnd_base_config_v1()
@@ -26,11 +28,24 @@ ACTIVE_ICM_SEARCH_SPACE = get_icm_search_space_v1()
 ACTIVE_NGU_SEARCH_SPACE = get_ngu_search_space_v1()
 
 
+def _build_intrinsic_placeholder_base_config(module_name: str, specific_config: dict[str, Any]) -> dict[str, Any]:
+    return {
+        **ACTIVE_GENERIC_BASE_CONFIG,
+        **specific_config,
+        "training_mode": "baseline",
+        "selected_intrinsic_modules": (module_name,),
+        "baseline_fixed_training_alpha": (
+            1.0 - DEFAULT_BASELINE_INTRINSIC_ALPHA,
+            DEFAULT_BASELINE_INTRINSIC_ALPHA,
+        ),
+    }
+
+
 def _build_curriculum_placeholder_base_config(module_names: tuple[str, ...]) -> dict[str, Any]:
     num_rewards = 1 + len(module_names)
-    equal_intrinsic_weight = 1.0 / num_rewards
-    extrinsic_weight = 1.0 - (equal_intrinsic_weight * len(module_names))
-    mixed_alpha = (extrinsic_weight, *(equal_intrinsic_weight for _ in module_names))
+    equal_alpha = 1.0 / num_rewards
+    mixed_alpha = tuple(equal_alpha for _ in range(num_rewards))
+    extrinsic_only_alpha = tuple(1.0 if idx == 0 else 0.0 for idx in range(num_rewards))
     extrinsic_only_alpha = tuple(1.0 if idx == 0 else 0.0 for idx in range(num_rewards))
     return {
         **ACTIVE_GENERIC_BASE_CONFIG,
@@ -41,21 +56,9 @@ def _build_curriculum_placeholder_base_config(module_names: tuple[str, ...]) -> 
 
 
 ACTIVE_INTRINSIC_BASE_CONFIGS = {
-    "rnd": {
-        **ACTIVE_GENERIC_BASE_CONFIG,
-        **ACTIVE_RND_BASE_CONFIG,
-        "training_mode": "baseline",
-    },
-    "icm": {
-        **ACTIVE_GENERIC_BASE_CONFIG,
-        **ACTIVE_ICM_BASE_CONFIG,
-        "training_mode": "baseline",
-    },
-    "ngu": {
-        **ACTIVE_GENERIC_BASE_CONFIG,
-        **ACTIVE_NGU_BASE_CONFIG,
-        "training_mode": "baseline",
-    },
+    "rnd": _build_intrinsic_placeholder_base_config("rnd", ACTIVE_RND_BASE_CONFIG),
+    "icm": _build_intrinsic_placeholder_base_config("icm", ACTIVE_ICM_BASE_CONFIG),
+    "ngu": _build_intrinsic_placeholder_base_config("ngu", ACTIVE_NGU_BASE_CONFIG),
 }
 ACTIVE_INTRINSIC_SEARCH_SPACES = {
     "rnd": ACTIVE_RND_SEARCH_SPACE,
@@ -67,10 +70,10 @@ ACTIVE_CURRICULUM_BASE_CONFIGS: dict[tuple[str, ...], dict[str, Any]] = {
     ("rnd",): _build_curriculum_placeholder_base_config(("rnd",)),
     ("icm",): _build_curriculum_placeholder_base_config(("icm",)),
     ("ngu",): _build_curriculum_placeholder_base_config(("ngu",)),
-    ("rnd", "icm"): _build_curriculum_placeholder_base_config(("rnd", "icm")),
-    ("rnd", "ngu"): _build_curriculum_placeholder_base_config(("rnd", "ngu")),
+    ("icm", "rnd"): _build_curriculum_placeholder_base_config(("rnd", "icm")),
+    ("ngu", "rnd"): _build_curriculum_placeholder_base_config(("rnd", "ngu")),
     ("icm", "ngu"): _build_curriculum_placeholder_base_config(("icm", "ngu")),
-    ("rnd", "icm", "ngu"): _build_curriculum_placeholder_base_config(("rnd", "icm", "ngu")),
+    ("icm", "ngu", "rnd"): _build_curriculum_placeholder_base_config(("rnd", "icm", "ngu")),
 }
 ACTIVE_CURRICULUM_SEARCH_SPACE = get_curriculum_search_space_v1()
 
