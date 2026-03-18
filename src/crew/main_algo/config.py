@@ -53,6 +53,29 @@ class ICMConfig:
 
 
 @dataclass
+class NGUConfig:
+    encoder_mode: str = "flat_symbolic"
+    output_embedding_dim: int = 64  # Size of KNN embedding space
+    head_activation: str = "relu"
+    head_hidden_dim: int = 64  # MLP hidden size
+
+    episodic_memory_capacity: int = 1000  # max embeddings stored per env per episode
+    num_neighbors: int = 10  # Number of neighbors to consider for each embedding
+    kernel_epsilon: float = 1e-3
+    kernel_cluster_distance: float = 1e-3
+
+    embedding_network_lr: float = 1e-4
+    embedding_update_epochs: int = 1
+    embedding_num_minibatches: int = 64
+    num_chunks_in_rewards_computation: int = 64
+    gamma: float = 0.99
+    gae_lambda: float = 0.95
+
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = ("flat_symbolic",)
+    SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+
+
+@dataclass
 class CurriculumConfig:
     score_lp_mode: str = "alp"
     score_lambda: float = 0.5
@@ -77,12 +100,12 @@ class TrainConfig:
     env_id: str = "Craftax-Classic-Symbolic-v1"
     achievement_ids_to_block: Sequence[int] = ()
     remove_health_reward: bool = False
-    episode_max_steps: int | None = 3000
+    episode_max_steps: int | None = 1000
     training_mode: str = "curriculum"
 
     # training
-    num_envs_per_batch: int = 1024
-    num_steps_per_env: int = 4096
+    num_envs_per_batch: int = 2048
+    num_steps_per_env: int = 5120
     num_steps_per_update: int = 256
     total_timesteps: int = 1_000_000_000
     num_batches_of_envs: int = field(init=False)
@@ -91,7 +114,6 @@ class TrainConfig:
 
     update_epochs: int = 1
     num_minibatches: int = 16
-    optimistic_reset_ratio_limit: int = 16
 
     adam_eps: float = 1e-5
     lr: float = 2e-4
@@ -99,7 +121,7 @@ class TrainConfig:
     clip_eps: float = 0.2
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    ent_coef: float = 0.01
+    ent_coef: float = 0.005
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
 
@@ -142,9 +164,10 @@ class TrainConfig:
     curriculum: CurriculumConfig = field(default_factory=CurriculumConfig)
     rnd: RNDConfig = field(default_factory=RNDConfig)
     icm: ICMConfig = field(default_factory=ICMConfig)
+    ngu: NGUConfig = field(default_factory=NGUConfig)
 
     # eval
-    eval_every_n_batches: int = 2
+    eval_every_n_batches: int = 1
     eval_num_envs: int = 1024
     eval_num_episodes: int = 2
     evaluation_alphas: tuple[tuple[float, ...], ...] | None = None
@@ -232,13 +255,9 @@ class TrainConfig:
             or self.num_steps_per_env <= 0
             or self.num_steps_per_update <= 0
             or self.num_minibatches <= 0
-            or self.optimistic_reset_ratio_limit <= 0
             or self.subsequence_length_in_loss_calculation <= 0
         ):
-            msg = (
-                "num_envs_per_batch, num_steps_per_env, num_steps_per_update, num_minibatches, "
-                "optimistic_reset_ratio_limit, and subsequence_length_in_loss_calculation must be > 0."
-            )
+            msg = "num_envs_per_batch, num_steps_per_env, num_steps_per_update, num_minibatches, and subsequence_length_in_loss_calculation must be > 0."
             raise ValueError(msg)
 
         if self.num_envs_per_batch % self.num_minibatches != 0:
@@ -298,7 +317,7 @@ class TrainConfig:
             if self.icm.num_minibatches <= 0 or self.icm.update_epochs <= 0:
                 msg = "icm.num_minibatches and icm.update_epochs must be > 0."
                 raise ValueError(msg)
-            
+
             total_steps_per_update = self.num_envs_per_batch * self.num_steps_per_update
             if total_steps_per_update % self.icm.num_minibatches != 0:
                 msg = f"Total collected steps per update (num_envs_per_batch * num_steps_per_update) must be divisible by icm.num_minibatches ({self.icm.num_minibatches})."
@@ -311,7 +330,39 @@ class TrainConfig:
                     f"({self.icm.num_chunks_in_rewards_computation})."
                 )
                 raise ValueError(msg)
-            
+
+        if "ngu" in self.selected_intrinsic_modules:
+            if self.ngu.head_activation not in NGUConfig.SUPPORTED_HEAD_ACTIVATIONS:
+                msg = f"ngu.head_activation must be one of {NGUConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.ngu.head_activation!r}."
+                raise ValueError(msg)
+            if (
+                self.ngu.embedding_num_minibatches <= 0
+                or self.ngu.num_chunks_in_rewards_computation <= 0
+                or self.ngu.episodic_memory_capacity <= 0
+                or self.ngu.num_neighbors <= 0
+            ):
+                msg = "ngu.embedding_num_minibatches, ngu.num_chunks_in_rewards_computation, ngu.episodic_memory_capacity, and ngu.num_neighbors must be > 0."
+                raise ValueError(msg)
+
+            total_steps_per_update = self.num_envs_per_batch * self.num_steps_per_update
+            if total_steps_per_update % self.ngu.embedding_num_minibatches != 0:
+                msg = f"Total collected steps per update (num_envs_per_batch * num_steps_per_update) must be divisible by ngu.embedding_num_minibatches ({self.ngu.embedding_num_minibatches})."
+                raise ValueError(msg)
+            if total_steps_per_update % self.ngu.num_chunks_in_rewards_computation != 0:
+                msg = (
+                    "Total collected steps per update "
+                    "(num_envs_per_batch * num_steps_per_update) must be divisible by "
+                    f"ngu.num_chunks_in_rewards_computation ({self.ngu.num_chunks_in_rewards_computation})."
+                )
+                raise ValueError(msg)
+            if self.episode_max_steps is not None and self.ngu.episodic_memory_capacity < self.episode_max_steps:
+                msg = (
+                    f"ngu.episodic_memory_capacity ({self.ngu.episodic_memory_capacity}) "
+                    f"must be >= episode_max_steps ({self.episode_max_steps}), "
+                    "otherwise observations will be silently overwritten mid-episode."
+                )
+                raise ValueError(msg)
+
     def _apply_mode_specific_overrides(self):
         if self.training_mode == "baseline":
             # Baseline policy/value are not alpha-conditioned.
@@ -404,6 +455,8 @@ class TrainConfig:
                 gamma_values.append(self.rnd.gamma)
             elif module_name == "icm":
                 gamma_values.append(self.icm.gamma)
+            elif module_name == "ngu":
+                gamma_values.append(self.ngu.gamma)
             else:
                 msg = f"Unsupported intrinsic module {module_name!r} for gamma construction."
                 raise ValueError(msg)
@@ -432,6 +485,8 @@ class TrainConfig:
                 gae_lambda_values.append(self.rnd.gae_lambda)
             elif module_name == "icm":
                 gae_lambda_values.append(self.icm.gae_lambda)
+            elif module_name == "ngu":
+                gae_lambda_values.append(self.ngu.gae_lambda)
             else:
                 msg = f"Unsupported intrinsic module {module_name!r} for gae_lambda construction."
                 raise ValueError(msg)
