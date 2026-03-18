@@ -55,12 +55,12 @@ class ICMConfig:
 @dataclass
 class NGUConfig:
     encoder_mode: str = "flat_symbolic"
-    output_embedding_dim: int = 64  # Size of KNN embedding space
+    output_embedding_dim: int = 64
     head_activation: str = "relu"
-    head_hidden_dim: int = 64  # MLP hidden size
+    head_hidden_dim: int = 64
 
-    episodic_memory_capacity: int = 1000  # max embeddings stored per env per episode
-    num_neighbors: int = 10  # Number of neighbors to consider for each embedding
+    episodic_memory_capacity: int = 4096  # was 1000
+    num_neighbors: int = 10
     kernel_epsilon: float = 1e-3
     kernel_cluster_distance: float = 1e-3
 
