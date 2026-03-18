@@ -100,12 +100,12 @@ class TrainConfig:
     env_id: str = "Craftax-Classic-Symbolic-v1"
     achievement_ids_to_block: Sequence[int] = ()
     remove_health_reward: bool = False
-    episode_max_steps: int | None = 1000
+    episode_max_steps: int | None = 3000
     training_mode: str = "curriculum"
 
     # training
-    num_envs_per_batch: int = 2048
-    num_steps_per_env: int = 5120
+    num_envs_per_batch: int = 1024
+    num_steps_per_env: int = 4096
     num_steps_per_update: int = 256
     total_timesteps: int = 1_000_000_000
     num_batches_of_envs: int = field(init=False)
@@ -122,7 +122,7 @@ class TrainConfig:
     clip_eps: float = 0.2
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    ent_coef: float = 0.005
+    ent_coef: float = 0.01
     vf_coef: float = 0.5
     max_grad_norm: float = 0.5
 
@@ -168,7 +168,7 @@ class TrainConfig:
     ngu: NGUConfig = field(default_factory=NGUConfig)
 
     # eval
-    eval_every_n_batches: int = 1
+    eval_every_n_batches: int = 2
     eval_num_envs: int = 1024
     eval_num_episodes: int = 2
     evaluation_alphas: tuple[tuple[float, ...], ...] | None = None
