@@ -55,7 +55,6 @@ class NGUModuleState(struct.PyTreeNode):
     embedding_train_state: TrainState
     episodic_memory: jax.Array  # [B, capacity, emb_dim] — per-env memory buffer
     memory_size: jax.Array  # [B] — how many slots filled per env
-    print("NGU module state initialized")
 
 
 def _run_episodic_memory_scan(
@@ -220,7 +219,6 @@ class NGUIntrinsicModule:
         metrics: IntrinsicUpdateMetrics = {
             "intrinsic_modules/ngu/embedding_loss": jnp.array(0.0),
         }
-        jax.debug.print("NGU module update complete")
         return updated_state, metrics
 
     def done_mask(self, env_done: jax.Array, config: Any) -> jax.Array:  # noqa: ARG002
