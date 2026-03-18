@@ -143,20 +143,9 @@ def _build_training_batch_log_payload_baseline(
     payload: dict[str, int | float] = {}
     for scalar_key in scalar_metric_keys:
         payload[scalar_key] = jnp.asarray(batch_metrics[scalar_key]).item()
-    if "intrinsic_modules/rnd/predictor_loss" in batch_metrics:
-        payload["intrinsic_modules/rnd/predictor_loss"] = jnp.asarray(
-            batch_metrics["intrinsic_modules/rnd/predictor_loss"]
-        ).item()
-    
-    icm_keys = (
-    "intrinsic_modules/icm/loss",
-    "intrinsic_modules/icm/inverse_loss",
-    "intrinsic_modules/icm/forward_loss",
-    )
-    for k in icm_keys:
-        if k in batch_metrics:
-            payload[k] = jnp.asarray(batch_metrics[k]).item()
-    
+    for key in batch_metrics:
+        if key.startswith("intrinsic_modules/"):
+            payload[key] = jnp.asarray(batch_metrics[key]).item()
 
     for reward_metric_key in reward_vector_metric_keys:
         _split_reward_vector_metric(
