@@ -17,6 +17,7 @@ from crew.main_algo.logging import (
     init_wandb_run,
     log_outer_batch_to_wandb,
 )
+from crew.main_algo.video import record_and_log_videos
 from crew.main_algo.types import (
     IntrinsicStates,
     RewardNormalizationStats,
@@ -225,6 +226,23 @@ def full_training_baseline(
                 print(f"[timing] update {update_num}: " f"logging={logging_time_sec:.6f}s")
         except Exception as error:  # pragma: no cover - logging must not stop training
             print(f"Failed to log outer update to Weights & Biases: {error}")
+
+    if config.video_num_episodes > 0:
+        try:
+            record_and_log_videos(
+                run=wandb_run,
+                train_state=runner_state.agent_train_state,
+                env=eval_env,
+                env_params=env_params,
+                config=config,
+                alpha=alpha,
+                num_episodes=config.video_num_episodes,
+                step=total_env_steps,
+                fps=config.video_fps,
+                rng=runner_state.rng,
+            )
+        except Exception as error:
+            print(f"Failed to record/log videos: {error}")
 
     finish_wandb_run(wandb_run)
 

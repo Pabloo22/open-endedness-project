@@ -125,6 +125,10 @@ class TrainConfig:
     evaluation_alpha_labels: tuple[str, ...] = field(init=False)
     evaluation_alphas_array: jnp.ndarray = field(init=False)
 
+    # video recording
+    video_num_episodes: int = 0  # 0 disables video recording
+    video_fps: int = 10
+
     # logging
     enable_wandb: bool = True
     wandb_project: str = "open_end_proj"
@@ -176,9 +180,7 @@ class TrainConfig:
         self.evaluation_alpha_labels = self._build_evaluation_alpha_labels()
 
     def _validate_selected_intrinsic_modules(self):
-        from crew.main_algo.intrinsic_modules.registry import (
-            get_registered_intrinsic_module_names,
-        )
+        from crew.main_algo.intrinsic_modules.registry import get_registered_intrinsic_module_names
 
         registered_names = get_registered_intrinsic_module_names()
         if self.training_mode == "curriculum" and not self.selected_intrinsic_modules:

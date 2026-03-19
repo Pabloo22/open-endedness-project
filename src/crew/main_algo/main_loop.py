@@ -27,6 +27,7 @@ from crew.main_algo.logging import (
     init_wandb_run,
     log_outer_batch_to_wandb,
 )
+from crew.main_algo.video import record_and_log_videos
 from crew.main_algo.types import (
     CurriculumState,
     IntrinsicStates,
@@ -398,6 +399,23 @@ def full_training(
                 )
         except Exception as error:  # pragma: no cover - logging must not stop training
             print(f"Failed to log outer batch to Weights & Biases: {error}")
+
+    if config.video_num_episodes > 0:
+        try:
+            video_alpha = config.evaluation_alphas_array[0]
+            record_and_log_videos(
+                run=wandb_run,
+                train_state=agent_train_state,
+                env=eval_env,
+                env_params=env_params,
+                config=config,
+                alpha=video_alpha,
+                num_episodes=config.video_num_episodes,
+                step=int(jnp.asarray(metrics_per_batch[-1]["run/total_env_steps"]).item()) if metrics_per_batch else None,
+                fps=config.video_fps,
+            )
+        except Exception as error:
+            print(f"Failed to record/log videos: {error}")
 
     finish_wandb_run(wandb_run)
 
