@@ -105,3 +105,9 @@ def get_generic_search_space_v2() -> dict[str, Any]:
         "ent_coef": {"values": [0.005, 0.01]},
         "train_seed": {"values": [1, 2, 3, 4, 5]},
     }
+
+
+def get_evaluation_search_space() -> dict[str, Any]:
+    return {
+        "train_seed": {"values": [6, 7, 8, 9, 10]},
+    }

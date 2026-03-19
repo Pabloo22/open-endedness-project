@@ -7,6 +7,7 @@ from ._generic_phase import (
     get_base_params_after_generic_sweep,
     get_best_generic_params,
     get_best_lightweight_generic_params,
+    get_evaluation_search_space,
 )
 from ._rnd_phase import (
     get_rnd_base_config_v1,

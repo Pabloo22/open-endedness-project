@@ -33,6 +33,10 @@ poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --m
 
 nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
     --enable-inner-wandb --count 100 >& nohup.out &
+
+with `get_best_generic_params`:
+nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid  \
+    --enable-inner-wandb --fixed-override video_num_episodes=5 --total-timesteps 1_000_000_000 >& nohup.out &
 """
 
 from __future__ import annotations

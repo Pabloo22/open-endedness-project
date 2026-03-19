@@ -5,6 +5,7 @@ from crew.experiments.tuning_configs import (
     get_best_generic_params,
     get_best_lightweight_generic_params,
     get_generic_search_space_v2,
+    get_evaluation_search_space,
     get_rnd_base_config_v1,
     get_rnd_search_space_v1,
     get_icm_base_config_v1,
@@ -16,8 +17,8 @@ from crew.experiments.tuning_configs import (
 from crew.experiments.tuning_configs._generic_phase import DEFAULT_BASELINE_INTRINSIC_ALPHA
 
 
-ACTIVE_GENERIC_BASE_CONFIG = get_best_lightweight_generic_params()  # For a bigger network use get_best_generic_params()
-ACTIVE_GENERIC_SEARCH_SPACE = get_generic_search_space_v2()
+ACTIVE_GENERIC_BASE_CONFIG = get_best_generic_params()  # For a bigger network use get_best_generic_params()
+ACTIVE_GENERIC_SEARCH_SPACE = get_evaluation_search_space()
 
 ACTIVE_RND_BASE_CONFIG = get_rnd_base_config_v1()
 ACTIVE_ICM_BASE_CONFIG = get_icm_base_config_v1()
