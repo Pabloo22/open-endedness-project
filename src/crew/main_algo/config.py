@@ -27,6 +27,31 @@ class RNDConfig:
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
 
 
+
+@dataclass
+class ICMConfig:
+    # NN configuration
+    activation_fn: str = "relu"
+    forward_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
+    inverse_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
+    
+    obs_emb_dim: int = 256
+    
+    # hyperparams
+    lr: float = 1e-4
+    reward_eta: float = 0.01
+    beta: float = 0.2
+    update_epochs: int = 1
+    num_minibatches: int = 64
+    num_chunks_in_rewards_computation: int = 64
+    eps: float = 1e-8
+    
+    gamma: float = 0.99
+    gae_lambda: float = 0.95
+    
+    SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+
+
 @dataclass
 class CurriculumConfig:
     score_lp_mode: str = "alp"
@@ -116,6 +141,7 @@ class TrainConfig:
     gae_lambda_per_reward_function: jnp.ndarray = field(init=False)
     curriculum: CurriculumConfig = field(default_factory=CurriculumConfig)
     rnd: RNDConfig = field(default_factory=RNDConfig)
+    icm: ICMConfig = field(default_factory=ICMConfig)
 
     # eval
     eval_every_n_batches: int = 2
@@ -259,6 +285,33 @@ class TrainConfig:
                 )
                 raise ValueError(msg)
 
+        if "icm" in self.selected_intrinsic_modules:
+            if self.icm.beta < 0.0 or self.icm.beta > 1.0:
+                msg = f"icm.beta must be in [0, 1]. Received {self.icm.beta}."
+                raise ValueError(msg)
+            if self.icm.reward_eta <= 0.0:
+                msg = f"icm.reward_eta must be > 0. Received {self.icm.reward_eta}."
+                raise ValueError(msg)
+            if self.icm.activation_fn not in ICMConfig.SUPPORTED_HEAD_ACTIVATIONS:
+                msg = f"icm.activation_fn must be one of {ICMConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.icm.activation_fn!r}."
+                raise ValueError(msg)
+            if self.icm.num_minibatches <= 0 or self.icm.update_epochs <= 0:
+                msg = "icm.num_minibatches and icm.update_epochs must be > 0."
+                raise ValueError(msg)
+            
+            total_steps_per_update = self.num_envs_per_batch * self.num_steps_per_update
+            if total_steps_per_update % self.icm.num_minibatches != 0:
+                msg = f"Total collected steps per update (num_envs_per_batch * num_steps_per_update) must be divisible by icm.num_minibatches ({self.icm.num_minibatches})."
+                raise ValueError(msg)
+            if total_steps_per_update % self.icm.num_chunks_in_rewards_computation != 0:
+                msg = (
+                    "Total collected steps per update "
+                    "(num_envs_per_batch * num_steps_per_update) must be divisible by "
+                    "icm.num_chunks_in_rewards_computation "
+                    f"({self.icm.num_chunks_in_rewards_computation})."
+                )
+                raise ValueError(msg)
+            
     def _apply_mode_specific_overrides(self):
         if self.training_mode == "baseline":
             # Baseline policy/value are not alpha-conditioned.
@@ -349,6 +402,8 @@ class TrainConfig:
         for module_name in self.selected_intrinsic_modules:
             if module_name == "rnd":
                 gamma_values.append(self.rnd.gamma)
+            elif module_name == "icm":
+                gamma_values.append(self.icm.gamma)
             else:
                 msg = f"Unsupported intrinsic module {module_name!r} for gamma construction."
                 raise ValueError(msg)
@@ -375,6 +430,8 @@ class TrainConfig:
         for module_name in self.selected_intrinsic_modules:
             if module_name == "rnd":
                 gae_lambda_values.append(self.rnd.gae_lambda)
+            elif module_name == "icm":
+                gae_lambda_values.append(self.icm.gae_lambda)
             else:
                 msg = f"Unsupported intrinsic module {module_name!r} for gae_lambda construction."
                 raise ValueError(msg)
