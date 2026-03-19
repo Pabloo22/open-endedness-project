@@ -18,7 +18,7 @@ orbax-checkpoint = ">=0.11.5"
 craftax = "^1.5.0"
 tqdm = ">=4.67.1"
 numpy = ">=2.2.1"
-wandb = "^0.25.0"
+wandb = {extras = ["media"], version = "^0.25.1"}
 jax = "^0.9.1"
 
 [tool.poetry.group.notebooks.dependencies]
