@@ -24,6 +24,16 @@ def get_rnd_base_config_v1() -> dict[str, Any]:
     }
 
 
+def get_rnd_base_config_v2() -> dict[str, Any]:
+    """Returns the specific hyperparameter values for the RND module"""
+    return {
+        **get_rnd_base_config_v1(),
+        "rnd.gae_lambda": 0.99,
+        "rnd.gamma": 0.995,
+        "rnd.predictor_num_minibatches": 32,
+    }
+
+
 def get_rnd_search_space_v1() -> dict[str, Any]:
     return {
         "rnd.predictor_network_lr": {"values": [1e-5, 5e-5, 8e-5, 1e-4, 3e-4, 5e-4]},
@@ -31,4 +41,29 @@ def get_rnd_search_space_v1() -> dict[str, Any]:
         "rnd.predictor_num_minibatches": {"values": [32, 64, 128]},
         "rnd.gamma": {"values": [0.99, 0.995, 0.999]},
         "rnd.gae_lambda": {"values": [0.95, 0.99]},
+    }
+
+
+def get_rnd_search_space_v2() -> dict[str, Any]:
+    return {
+        "rnd.predictor_network_lr": {"values": [1e-5, 5e-5, 1e-4, 5e-4]},
+        "rnd.predictor_update_epochs": {"values": [1, 3]},
+        "rnd.predictor_num_minibatches": {"values": [32, 64]},
+        "rnd.gamma": {"values": [0.99, 0.995]},
+        "baseline_fixed_training_alpha": {
+            "values": [
+                (0.99, 0.01),
+                (0.95, 0.05),
+                (0.9, 0.1),
+                (0.8, 0.2),
+                (0.7, 0.3),
+                (0.6, 0.4),
+                (0.5, 0.5),
+                (0.4, 0.6),
+                (0.3, 0.7),
+                (0.2, 0.8),
+                (0.1, 0.9),
+                (0.0, 1.0),
+            ]
+        },
     }

@@ -12,6 +12,8 @@ from ._generic_phase import (
 from ._rnd_phase import (
     get_rnd_base_config_v1,
     get_rnd_search_space_v1,
+    get_rnd_base_config_v2,
+    get_rnd_search_space_v2,
 )
 from ._icm_phase import (
     get_icm_base_config_v1,
@@ -47,6 +49,8 @@ __all__ = [
     "get_best_lightweight_generic_params",
     "get_rnd_base_config_v1",
     "get_rnd_search_space_v1",
+    "get_rnd_base_config_v2",
+    "get_rnd_search_space_v2",
     "get_icm_base_config_v1",
     "get_icm_search_space_v1",
     "get_ngu_base_config_v1",
