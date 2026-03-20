@@ -52,6 +52,8 @@ def get_rnd_search_space_v2() -> dict[str, Any]:
         "rnd.gamma": {"values": [0.99, 0.995]},
         "baseline_fixed_training_alpha": {
             "values": [
+                (0.999, 0.001),
+                (0.995, 0.005),
                 (0.99, 0.01),
                 (0.95, 0.05),
                 (0.9, 0.1),
