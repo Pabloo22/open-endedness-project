@@ -1,22 +1,15 @@
 import copy
 from typing import Any
 
-from crew.experiments.tuning_configs import (
-    get_best_generic_params,
+from crew.experiments.tuning_configs._curriculum_phase import get_curriculum_search_space_v1
+from crew.experiments.tuning_configs._generic_phase import (
+    DEFAULT_BASELINE_INTRINSIC_ALPHA,
     get_best_lightweight_generic_params,
     get_evaluation_search_space,
-    get_rnd_base_config_v1,
-    get_rnd_search_space_v1,
-    get_rnd_base_config_v2,
-    get_rnd_search_space_v2,
-    get_icm_base_config_v1,
-    get_icm_search_space_v1,
-    get_ngu_base_config_v1,
-    get_ngu_search_space_v1,
-    get_ngu_search_space_v2,
-    get_curriculum_search_space_v1,
 )
-from crew.experiments.tuning_configs._generic_phase import DEFAULT_BASELINE_INTRINSIC_ALPHA
+from crew.experiments.tuning_configs._icm_phase import get_icm_base_config_v1, get_icm_search_space_v1
+from crew.experiments.tuning_configs._ngu_phase import get_ngu_base_config_v1, get_ngu_search_space_v2
+from crew.experiments.tuning_configs._rnd_phase import get_rnd_base_config_v2, get_rnd_search_space_v2
 
 ACTIVE_GENERIC_BASE_CONFIG = get_best_lightweight_generic_params()  # For a bigger network use get_best_generic_params()
 ACTIVE_GENERIC_SEARCH_SPACE = get_evaluation_search_space()
