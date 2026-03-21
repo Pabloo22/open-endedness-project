@@ -19,7 +19,7 @@ from ._generic_phase import (
     get_lightweight_base_params,
 )
 from ._icm_phase import get_icm_base_config_v1, get_icm_search_space_v1
-from ._ngu_phase import get_ngu_base_config_v1, get_ngu_search_space_v1, get_ngu_search_space_v2
+from ._ngu_phase import get_ngu_base_config_v1, get_ngu_search_space_v1
 from ._rnd_phase import get_rnd_base_config_v1, get_rnd_search_space_v1, get_rnd_base_config_v2, get_rnd_search_space_v2
 
 __all__ = [
@@ -39,7 +39,6 @@ __all__ = [
     "get_icm_search_space_v1",
     "get_ngu_base_config_v1",
     "get_ngu_search_space_v1",
-    "get_ngu_search_space_v2",
     "get_generic_base_config",
     "get_generic_search_space",
     "get_intrinsic_base_config",
