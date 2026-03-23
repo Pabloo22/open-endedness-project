@@ -29,6 +29,7 @@ def get_ngu_base_config_v2() -> dict[str, Any]:
         **get_ngu_base_config_v1(),
         "ngu.kernel_epsilon": 1e-3,
         "ngu.num_neighbors": 10,
+        "ngu.output_embedding_dim": 64,
     }
 
 
@@ -47,10 +48,8 @@ def get_ngu_search_space_v1() -> dict[str, Any]:
 
 def get_ngu_search_space_v2() -> dict[str, Any]:
     return {
-        "ngu.gamma": {"values": [0.997, 0.998, 0.999]},
-        "ngu.output_embedding_dim": {"values": [32, 64]},
+        "ngu.gamma": {"values": [0.998, 0.999]},
         "ngu.kernel_cluster_distance": {"values": [5e-5, 1e-4]},
-        "baseline_fixed_training_alpha": {"values": [(0.9, 0.1), (0.85, 0.15), (0.8, 0.2)]},
         "baseline_fixed_training_alpha": {
             "values": [
                 (0.999, 0.001),
