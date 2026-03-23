@@ -24,6 +24,14 @@ def get_ngu_base_config_v1() -> dict[str, Any]:
     }
 
 
+def get_ngu_base_config_v2() -> dict[str, Any]:
+    return {
+        **get_ngu_base_config_v1(),
+        "ngu.kernel_epsilon": 1e-3,
+        "ngu.num_neighbors": 10,
+    }
+
+
 def get_ngu_search_space_v1() -> dict[str, Any]:
     """Search space for the NGU phase, comments indicate importance based on heuristic guess."""
     # Total coverage is 486 combos for grid search. 50 for random search could be enough.
@@ -34,4 +42,13 @@ def get_ngu_search_space_v1() -> dict[str, Any]:
         "ngu.output_embedding_dim": {"values": [32, 64, 128]},  # Med
         "ngu.kernel_cluster_distance": {"values": [1e-4, 1e-3]},  # Low
         "baseline_fixed_training_alpha": {"values": [(0.9, 0.1), (0.8, 0.2), (0.7, 0.3)]},  # High
+    }
+
+
+def get_ngu_search_space_v2() -> dict[str, Any]:
+    return {
+        "ngu.gamma": {"values": [0.997, 0.998, 0.999]},
+        "ngu.output_embedding_dim": {"values": [32, 64]},
+        "ngu.kernel_cluster_distance": {"values": [5e-5, 1e-4]},
+        "baseline_fixed_training_alpha": {"values": [(0.9, 0.1), (0.85, 0.15), (0.8, 0.2)]},
     }

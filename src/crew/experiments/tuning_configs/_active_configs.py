@@ -8,7 +8,7 @@ from crew.experiments.tuning_configs._generic_phase import (
     get_evaluation_search_space,
 )
 from crew.experiments.tuning_configs._icm_phase import get_icm_base_config_v1, get_icm_search_space_v1
-from crew.experiments.tuning_configs._ngu_phase import get_ngu_base_config_v1, get_ngu_search_space_v1
+from crew.experiments.tuning_configs._ngu_phase import get_ngu_base_config_v2
 from crew.experiments.tuning_configs._rnd_phase import get_rnd_base_config_v2, get_rnd_search_space_v2
 
 ACTIVE_GENERIC_BASE_CONFIG = get_best_lightweight_generic_params()  # For a bigger network use get_best_generic_params()
@@ -16,11 +16,11 @@ ACTIVE_GENERIC_SEARCH_SPACE = get_evaluation_search_space()
 
 ACTIVE_RND_BASE_CONFIG = get_rnd_base_config_v2()
 ACTIVE_ICM_BASE_CONFIG = get_icm_base_config_v1()
-ACTIVE_NGU_BASE_CONFIG = get_ngu_base_config_v1()
+ACTIVE_NGU_BASE_CONFIG = get_ngu_base_config_v2()
 
 ACTIVE_RND_SEARCH_SPACE = get_rnd_search_space_v2()
 ACTIVE_ICM_SEARCH_SPACE = get_icm_search_space_v1()
-ACTIVE_NGU_SEARCH_SPACE = get_ngu_search_space_v1()
+ACTIVE_NGU_SEARCH_SPACE = get_ngu_search_space_v2()
 
 
 def _build_intrinsic_placeholder_base_config(module_name: str, specific_config: dict[str, Any]) -> dict[str, Any]:
