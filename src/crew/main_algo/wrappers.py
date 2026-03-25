@@ -29,6 +29,24 @@ class GymnaxWrapper(object):
         return getattr(self._env, name)
 
 
+class FixedWorldWrapper(GymnaxWrapper):
+    """Wraps an environment to always reset to the exact same world map (and initial state) 
+    by fixing the RNG key used for resets."""
+
+    def __init__(self, env, fixed_seed: int = 42):
+        super().__init__(env)
+        self.fixed_rng = jax.random.PRNGKey(fixed_seed)
+
+    @partial(jax.jit, static_argnums=(0, 2))
+    def reset(self, rng, params=None):
+        # Ignore the passed rng, use the fixed one to guarantee the same map
+        return self._env.reset(self.fixed_rng, params)
+
+    @partial(jax.jit, static_argnums=(0, 4))
+    def step(self, rng, state, action, params=None):
+        return self._env.step(rng, state, action, params)
+
+
 class AutoResetEnvWrapper(GymnaxWrapper):
     """Provides standard auto-reset functionality, providing the same behaviour as Gymnax-default."""
 

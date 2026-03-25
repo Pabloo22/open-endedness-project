@@ -156,6 +156,9 @@ class TrainConfig:
     use_weighted_value_loss: bool = True
 
     # module selection and module-specific nested config
+    use_fixed_world: bool = False
+    fixed_world_seed: int = 42
+
     selected_intrinsic_modules: tuple[str, ...] = ("rnd",)
     baseline_fixed_training_alpha: tuple[float, ...] | None = None
     num_reward_functions: int = field(init=False)
