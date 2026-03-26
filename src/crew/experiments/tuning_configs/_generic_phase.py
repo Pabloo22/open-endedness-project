@@ -113,4 +113,3 @@ def get_evaluation_search_space() -> dict[str, Any]:
     return {
         "train_seed": {"values": [6, 7, 8, 9, 10]},
     }
-
