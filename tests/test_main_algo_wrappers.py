@@ -3,9 +3,14 @@ import unittest
 import jax
 import jax.numpy as jnp
 import numpy as np
+from craftax.craftax_env import make_craftax_env_from_name
 
 from crew.main_algo.setups import _resolve_optimistic_reset_ratio
-from crew.main_algo.wrappers import FixedResetKeyEnvWrapper, OptimisticResetVecEnvWrapper
+from crew.main_algo.wrappers import (
+    FixedResetKeyEnvWrapper,
+    OptimisticResetVecEnvWrapper,
+    SparseCraftaxWrapper,
+)
 
 
 class _DummyVecEnv:
@@ -167,6 +172,43 @@ class TestOptimisticResetRatioResolution(unittest.TestCase):
         self.assertEqual(_resolve_optimistic_reset_ratio(num_envs=12, ratio_limit=16), 12)
         self.assertEqual(_resolve_optimistic_reset_ratio(num_envs=7, ratio_limit=16), 7)
         self.assertEqual(_resolve_optimistic_reset_ratio(num_envs=20, ratio_limit=6), 5)
+
+
+class TestFixedResetKeyEnvWrapperCraftaxIntegration(unittest.TestCase):
+    def _make_craftax_env(self, fixed_reset_seed: int):
+        base_env = make_craftax_env_from_name("Craftax-Classic-Symbolic-v1", auto_reset=False)
+        env_params = base_env.default_params.replace(max_timesteps=32)
+        base_env = SparseCraftaxWrapper(base_env)
+        env = OptimisticResetVecEnvWrapper(
+            FixedResetKeyEnvWrapper(base_env, fixed_reset_seed=fixed_reset_seed),
+            num_envs=4,
+            reset_ratio=2,
+        )
+        return env, env_params
+
+    def test_craftax_resets_repeat_the_same_world_with_fixed_reset_wrapper(self):
+        env, env_params = self._make_craftax_env(fixed_reset_seed=17)
+
+        obs_first, state_first = env.reset(jax.random.key(0), env_params)
+        obs_second, state_second = env.reset(jax.random.key(999), env_params)
+
+        np.testing.assert_array_equal(np.asarray(obs_first), np.asarray(obs_second))
+        np.testing.assert_array_equal(np.asarray(state_first.map), np.asarray(state_second.map))
+        np.testing.assert_array_equal(
+            np.asarray(state_first.player_position),
+            np.asarray(state_second.player_position),
+        )
+
+        reference_map = np.asarray(state_first.map[0])
+        reference_obs = np.asarray(obs_first[0])
+        reference_player_position = np.asarray(state_first.player_position[0])
+        for env_idx in range(1, 4):
+            np.testing.assert_array_equal(reference_map, np.asarray(state_first.map[env_idx]))
+            np.testing.assert_array_equal(reference_obs, np.asarray(obs_first[env_idx]))
+            np.testing.assert_array_equal(
+                reference_player_position,
+                np.asarray(state_first.player_position[env_idx]),
+            )
 
 
 if __name__ == "__main__":

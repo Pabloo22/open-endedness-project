@@ -51,6 +51,8 @@ def setup_actor_critic_train_state(
         num_actions=num_actions,
         num_reward_functions=config.num_reward_functions,
         # observation encoder
+        env_id=config.env_id,
+        encoder_mode=config.encoder_mode,
         obs_emb_dim=config.obs_emb_dim,
         # transformer
         hidden_dim=config.transformer_hidden_states_dim,

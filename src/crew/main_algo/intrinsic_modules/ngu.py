@@ -12,18 +12,23 @@ from flax.linen.initializers import constant, orthogonal
 from flax.training.train_state import TrainState
 
 from crew.main_algo.types import IntrinsicModulesUpdateData, IntrinsicUpdateMetrics, TransitionDataBase
-from crew.networks.encoders import ObsEncoderFlatSymbolic
+from crew.networks.encoders import build_observation_encoder
 
 
 class NGUEmbeddingNetwork(nn.Module):
     encoder_mode: str
+    env_id: str
     output_embedding_dim: int
     obs_emb_dim: int
     head_activation: str
     head_hidden_dim: int
 
     def setup(self):
-        self.input_encoder = ObsEncoderFlatSymbolic(obs_emb_dim=self.obs_emb_dim)
+        self.input_encoder = build_observation_encoder(
+            encoder_mode=self.encoder_mode,
+            env_id=self.env_id,
+            obs_emb_dim=self.obs_emb_dim,
+        )
 
         if self.head_activation == "relu":
             self.activation_fn = nn.relu
@@ -137,7 +142,8 @@ class NGUIntrinsicModule:
     ) -> NGUModuleState:
         init_obs = jnp.zeros((2, *obs_shape), dtype=jnp.float32)
         network = NGUEmbeddingNetwork(
-            encoder_mode=config.ngu.encoder_mode,
+            encoder_mode=config.encoder_mode,
+            env_id=config.env_id,
             output_embedding_dim=config.ngu.output_embedding_dim,
             obs_emb_dim=config.obs_emb_dim,
             head_activation=config.ngu.head_activation,
