@@ -21,6 +21,7 @@ from crew.main_algo.types import (
     RewardNormalizationStats,
 )
 from crew.main_algo.wrappers import (
+    FixedResetKeyEnvWrapper,
     OptimisticResetVecEnvWrapper,
     SparseCraftaxWrapper,
     FixedWorldWrapper,
@@ -180,6 +181,11 @@ def set_up_for_training(
         blocked_achievement_ids=config.achievement_ids_to_block,
         remove_health_reward=config.remove_health_reward,
     )
+    if not config.procedural_generation:
+        base_env = FixedResetKeyEnvWrapper(
+            base_env,
+            fixed_reset_seed=config.fixed_reset_seed,
+        )
     reset_ratio = _resolve_optimistic_reset_ratio(
         num_envs=config.num_envs_per_batch,
         ratio_limit=config.optimistic_reset_ratio_limit,

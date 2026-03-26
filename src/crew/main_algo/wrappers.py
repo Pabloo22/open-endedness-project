@@ -78,6 +78,20 @@ class AutoResetEnvWrapper(GymnaxWrapper):
         return obs, state, reward, done, info
 
 
+class FixedResetKeyEnvWrapper(GymnaxWrapper):
+    """Forces every environment reset to reuse the same reset key."""
+
+    def __init__(self, env, fixed_reset_seed: int):
+        super().__init__(env)
+        self.fixed_reset_seed = fixed_reset_seed
+        self._fixed_reset_key = jax.random.key(fixed_reset_seed)
+
+    @partial(jax.jit, static_argnums=(0, 2))
+    def reset(self, key, params=None):
+        del key
+        return self._env.reset(self._fixed_reset_key, params)
+
+
 class OptimisticResetVecEnvWrapper(GymnaxWrapper):
     """
     Provides efficient 'optimistic' resets.
