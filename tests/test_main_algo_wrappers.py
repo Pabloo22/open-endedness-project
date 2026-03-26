@@ -5,7 +5,7 @@ import jax.numpy as jnp
 import numpy as np
 
 from crew.main_algo.setups import _resolve_optimistic_reset_ratio
-from crew.main_algo.wrappers import OptimisticResetVecEnvWrapper
+from crew.main_algo.wrappers import AutoResetEnvWrapper, OptimisticResetVecEnvWrapper
 
 
 class _DummyVecEnv:
@@ -21,6 +21,28 @@ class _DummyVecEnv:
         done = action.astype(jnp.bool_)
         reward = action.astype(jnp.float32)
         obs = jnp.asarray([next_state.astype(jnp.float32)], dtype=jnp.float32)
+        return obs, next_state, reward, done, {}
+
+
+class _DummyAutoResetShapeMismatchEnv:
+    def reset(self, key, params=None):
+        del key, params
+        obs = jnp.asarray([0.0, 0.0], dtype=jnp.float32)
+        state = {
+            "counter": jnp.array(0, dtype=jnp.int32),
+            "rng_like": jnp.array(0, dtype=jnp.int32),
+        }
+        return obs, state
+
+    def step(self, key, state, action, params=None):
+        del key, action, params
+        obs = jnp.asarray([1.0, 1.0], dtype=jnp.float32)
+        next_state = {
+            "counter": state["counter"] + jnp.array(1, dtype=jnp.int32),
+            "rng_like": jnp.asarray([10, 20], dtype=jnp.int32),
+        }
+        reward = jnp.array(1.0, dtype=jnp.float32)
+        done = jnp.array(False, dtype=jnp.bool_)
         return obs, next_state, reward, done, {}
 
 
@@ -54,6 +76,26 @@ class TestOptimisticResetVecEnvWrapper(unittest.TestCase):
         np.testing.assert_array_equal(np.asarray(reward), np.asarray([0.0, 1.0, 0.0, 0.0], dtype=np.float32))
         np.testing.assert_array_equal(np.asarray(state), np.asarray([1, -5, 3, 4], dtype=np.int32))
         np.testing.assert_allclose(np.asarray(obs[:, 0]), np.asarray([1.0, -5.0, 3.0, 4.0], dtype=np.float32), rtol=0, atol=0)
+
+
+class TestAutoResetEnvWrapper(unittest.TestCase):
+    def test_step_handles_broadcastable_state_leaf_shape_mismatch(self):
+        env = AutoResetEnvWrapper(_DummyAutoResetShapeMismatchEnv())
+        _, state = env.reset(jax.random.key(0), None)
+
+        obs, next_state, reward, done, info = env.step(
+            jax.random.key(1),
+            state,
+            jnp.array(0, dtype=jnp.int32),
+            None,
+        )
+
+        np.testing.assert_array_equal(np.asarray(obs), np.asarray([1.0, 1.0], dtype=np.float32))
+        np.testing.assert_array_equal(np.asarray(next_state["counter"]), np.asarray(1, dtype=np.int32))
+        np.testing.assert_array_equal(np.asarray(next_state["rng_like"]), np.asarray([10, 20], dtype=np.int32))
+        np.testing.assert_array_equal(np.asarray(reward), np.asarray(1.0, dtype=np.float32))
+        np.testing.assert_array_equal(np.asarray(done), np.asarray(False, dtype=bool))
+        self.assertEqual(info, {})
 
 
 class TestOptimisticResetRatioResolution(unittest.TestCase):

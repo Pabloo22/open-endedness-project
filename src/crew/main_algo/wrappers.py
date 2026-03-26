@@ -178,7 +178,12 @@ class SparseCraftaxWrapper(GymnaxWrapper):
     ):
         super().__init__(env)
 
-        if isinstance(env, (CraftaxClassicSymbolicEnv, CraftaxClassicSymbolicEnvNoAutoReset)):
+        if isinstance(env, FixedWorldWrapper):
+            eval_env = env._env
+        else:
+            eval_env = env
+
+        if isinstance(eval_env, (CraftaxClassicSymbolicEnv, CraftaxClassicSymbolicEnvNoAutoReset)):
             num_achievements = len(classic_craftax_constants.Achievement)
             # Classic craftax doesn't have a reward map because its rewards are all 1, so we can just create a mask.
             achievement_reward_map = jnp.ones(num_achievements, dtype=jnp.float32)
