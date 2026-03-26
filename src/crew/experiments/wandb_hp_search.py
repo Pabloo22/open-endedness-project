@@ -47,10 +47,10 @@ nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase gener
     --enable-inner-wandb --fixed-override video_num_episodes=5 --total-timesteps 1_000_000_000 \
     --sweep-id pp976ug7 >& nohup.out &
 
-with `get_best_generic_params` and `get_best_rnd_config_provisional`:
+with `get_best_generic_params` and `get_best_rnd_config_provisional` and SPARSER VERSION:
 nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
     --method grid  --enable-inner-wandb --fixed-override video_num_episodes=3 --total-timesteps 200_000_000 \
-    --fixed-override use_fixed_world=True >& nohup.out &
+    --fixed-override use_fixed_world=False >& nohup.out &
 """
 
 from __future__ import annotations

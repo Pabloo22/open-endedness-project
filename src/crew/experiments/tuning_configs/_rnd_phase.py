@@ -84,5 +84,5 @@ def get_best_rnd_config_provisional() -> dict[str, Any]:
 
 def get_rnd_search_space_for_quick_eval() -> dict[str, Any]:
     return {
-        "train_seed": {"values": [1]},
+        "train_seed": {"values": [6, 7, 8, 9, 10]},
     }
