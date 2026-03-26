@@ -29,11 +29,12 @@ class TestSetUpForTrainingResetWrapperComposition(unittest.TestCase):
         default_params.replace.return_value = "env_params"
         return SimpleNamespace(default_params=default_params)
 
-    def _run_setup(self, *, procedural_generation: bool, fixed_reset_seed: int):
+    def _run_setup(self, *, procedural_generation: bool, fixed_reset_seed: int, optimistic_reset_ratio_limit: int = 16):
         config = TrainConfig(
             **_base_config_kwargs(),
             procedural_generation=procedural_generation,
             fixed_reset_seed=fixed_reset_seed,
+            optimistic_reset_ratio_limit=optimistic_reset_ratio_limit,
         )
         base_env = self._make_base_env()
 
@@ -56,22 +57,26 @@ class TestSetUpForTrainingResetWrapperComposition(unittest.TestCase):
         output, _sparse_wrapper_mock, fixed_wrapper_mock, vec_wrapper_mock = self._run_setup(
             procedural_generation=False,
             fixed_reset_seed=777,
+            optimistic_reset_ratio_limit=4,
         )
 
         fixed_wrapper_mock.assert_called_once_with("sparse_env", fixed_reset_seed=777)
         vec_wrapper_mock.assert_called_once()
         self.assertEqual(vec_wrapper_mock.call_args.args[0], "fixed_env")
+        self.assertEqual(vec_wrapper_mock.call_args.kwargs["reset_ratio"], 16)
         self.assertEqual(output[1], "vec_env")
 
     def test_setup_skips_fixed_reset_wrapper_when_procedural_generation_is_enabled(self):
         output, _sparse_wrapper_mock, fixed_wrapper_mock, vec_wrapper_mock = self._run_setup(
             procedural_generation=True,
             fixed_reset_seed=777,
+            optimistic_reset_ratio_limit=8,
         )
 
         fixed_wrapper_mock.assert_not_called()
         vec_wrapper_mock.assert_called_once()
         self.assertEqual(vec_wrapper_mock.call_args.args[0], "sparse_env")
+        self.assertEqual(vec_wrapper_mock.call_args.kwargs["reset_ratio"], 8)
         self.assertEqual(output[1], "vec_env")
 
 

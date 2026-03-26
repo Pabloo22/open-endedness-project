@@ -184,9 +184,14 @@ def set_up_for_training(
             base_env,
             fixed_reset_seed=config.fixed_reset_seed,
         )
+    reset_ratio_limit = (
+        config.num_envs_per_batch
+        if not config.procedural_generation
+        else config.optimistic_reset_ratio_limit
+    )
     reset_ratio = _resolve_optimistic_reset_ratio(
         num_envs=config.num_envs_per_batch,
-        ratio_limit=config.optimistic_reset_ratio_limit,
+        ratio_limit=reset_ratio_limit,
     )
     env = OptimisticResetVecEnvWrapper(
         base_env,
