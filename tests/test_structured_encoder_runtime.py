@@ -13,22 +13,37 @@ from crew.main_algo.types import IntrinsicModulesUpdateData, TransitionDataBase
 from crew.networks.encoders import (
     CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
     CRAFTAX_SYMBOLIC_ENV_ID,
-    get_craftax_symbolic_observation_spec,
     split_flat_craftax_symbolic_observation,
 )
+
+
+def _layout(env_id: str) -> dict[str, int]:
+    if env_id == CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID:
+        return {
+            "num_block_tokens": 17,
+            "num_item_tokens": 0,
+            "flat_map_dim": 1323,
+            "total_obs_dim": 1345,
+        }
+    return {
+        "num_block_tokens": 37,
+        "num_item_tokens": 5,
+        "flat_map_dim": 8217,
+        "total_obs_dim": 8268,
+    }
 
 
 def _roundtrip_flat_observations(
     observations: jax.Array,
     env_id: str,
 ) -> jax.Array:
-    spec = get_craftax_symbolic_observation_spec(env_id)
-    structured = split_flat_craftax_symbolic_observation(observations, spec)
+    layout = _layout(env_id)
+    structured = split_flat_craftax_symbolic_observation(observations, env_id)
 
     block_ids = structured.block_ids
     block_one_hot = jax.nn.one_hot(
         jnp.maximum(block_ids - 1, 0),
-        num_classes=spec.num_block_tokens,
+        num_classes=layout["num_block_tokens"],
         dtype=jnp.float32,
     ) * (block_ids > 0)[..., None].astype(jnp.float32)
 
@@ -37,7 +52,7 @@ def _roundtrip_flat_observations(
         item_ids = structured.item_ids
         item_one_hot = jax.nn.one_hot(
             jnp.maximum(item_ids - 1, 0),
-            num_classes=spec.num_item_tokens,
+            num_classes=layout["num_item_tokens"],
             dtype=jnp.float32,
         ) * (item_ids > 0)[..., None].astype(jnp.float32)
         map_parts.append(item_one_hot)
@@ -46,7 +61,7 @@ def _roundtrip_flat_observations(
     if structured.visibility is not None:
         map_parts.append(structured.visibility[..., None].astype(jnp.float32))
 
-    reconstructed_map = jnp.concatenate(map_parts, axis=-1).reshape((observations.shape[0], spec.flat_map_dim))
+    reconstructed_map = jnp.concatenate(map_parts, axis=-1).reshape((observations.shape[0], layout["flat_map_dim"]))
     return jnp.concatenate([reconstructed_map, structured.extra_features], axis=-1)
 
 
@@ -183,7 +198,7 @@ class TestStructuredEncoderIntrinsicModuleSmoke(unittest.TestCase):
         for module_name in ("rnd", "ngu", "icm"):
             with self.subTest(module_name=module_name):
                 config = _build_intrinsic_module_config(module_name)
-                obs_shape = (get_craftax_symbolic_observation_spec(config.env_id).total_obs_dim,)
+                obs_shape = (_layout(config.env_id)["total_obs_dim"],)
                 rollout, update_data = _make_intrinsic_transitions(config)
                 module = get_intrinsic_module(module_name)
 
