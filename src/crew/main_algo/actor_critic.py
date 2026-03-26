@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 from flax.linen.initializers import constant, orthogonal
 
-from crew.networks.encoders import ObsEncoderFlatSymbolic
+from crew.networks.encoders import build_observation_encoder
 from crew.networks.transformer_xl_base import Transformer_XL
 
 
@@ -32,6 +32,8 @@ class ActorCriticTransformer(nn.Module):
     num_actions: int
     num_reward_functions: int
     # observation encoder
+    env_id: str
+    encoder_mode: str
     obs_emb_dim: int
     # transformer
     hidden_dim: int
@@ -49,7 +51,11 @@ class ActorCriticTransformer(nn.Module):
     inject_alpha_at_critic_head: bool
 
     def setup(self):
-        self.input_encoder = ObsEncoderFlatSymbolic(obs_emb_dim=self.obs_emb_dim)
+        self.input_encoder = build_observation_encoder(
+            encoder_mode=self.encoder_mode,
+            env_id=self.env_id,
+            obs_emb_dim=self.obs_emb_dim,
+        )
         self.transformer = Transformer_XL(
             hidden_dim=self.hidden_dim,
             num_heads=self.num_attn_heads,
