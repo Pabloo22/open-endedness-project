@@ -8,7 +8,7 @@ from crew.experiments.tuning_configs._generic_phase import (
     get_evaluation_search_space,
 )
 from crew.experiments.tuning_configs._icm_phase import get_icm_base_config_v1, get_icm_search_space_v1
-from crew.experiments.tuning_configs._ngu_phase import get_ngu_base_config_v1, get_ngu_search_space_v2
+from crew.experiments.tuning_configs._ngu_phase import get_ngu_base_config_v2, get_ngu_search_space_v2
 from crew.experiments.tuning_configs._rnd_phase import get_best_rnd_config_provisional, get_rnd_search_space_for_quick_eval
 
 ACTIVE_GENERIC_BASE_CONFIG = get_best_generic_params()  # For a smaller network use get_best_lightweight_generic_params()
