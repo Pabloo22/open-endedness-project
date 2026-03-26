@@ -69,6 +69,23 @@ class TestMainAlgoEvalConfig(unittest.TestCase):
         )
         self.assertTrue(timing_config.is_timing_run)
 
+    def test_procedural_generation_defaults_and_fixed_reset_seed_are_independent(self):
+        default_config = TrainConfig(
+            **_base_config_kwargs(),
+        )
+        self.assertTrue(default_config.procedural_generation)
+        self.assertEqual(default_config.fixed_reset_seed, 12345)
+
+        overridden_config = TrainConfig(
+            **_base_config_kwargs(),
+            train_seed=99,
+            fixed_reset_seed=777,
+            procedural_generation=False,
+        )
+        self.assertEqual(overridden_config.train_seed, 99)
+        self.assertEqual(overridden_config.fixed_reset_seed, 777)
+        self.assertFalse(overridden_config.procedural_generation)
+
     def test_invalid_evaluation_alphas_raise(self):
         with self.assertRaises(ValueError):
             TrainConfig(
