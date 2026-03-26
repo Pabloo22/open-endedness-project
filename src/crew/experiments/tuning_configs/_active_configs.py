@@ -16,7 +16,7 @@ ACTIVE_GENERIC_SEARCH_SPACE = get_evaluation_search_space()
 
 ACTIVE_RND_BASE_CONFIG = get_best_rnd_config_provisional()
 ACTIVE_ICM_BASE_CONFIG = get_icm_base_config_v1()
-ACTIVE_NGU_BASE_CONFIG = get_ngu_base_config_v1()
+ACTIVE_NGU_BASE_CONFIG = get_ngu_base_config_v2()
 
 ACTIVE_RND_SEARCH_SPACE = get_rnd_search_space_for_quick_eval()
 ACTIVE_ICM_SEARCH_SPACE = get_icm_search_space_v1()

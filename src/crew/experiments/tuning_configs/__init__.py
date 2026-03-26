@@ -46,7 +46,6 @@ __all__ = [
     "get_icm_search_space_v1",
     "get_ngu_base_config_v1",
     "get_ngu_search_space_v1",
-    "get_ngu_search_space_v2",
     "get_generic_base_config",
     "get_generic_search_space",
     "get_intrinsic_base_config",
