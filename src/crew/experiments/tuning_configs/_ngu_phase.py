@@ -42,7 +42,6 @@ def get_ngu_search_space_v1() -> dict[str, Any]:
         "ngu.gamma": {"values": [0.99, 0.995, 0.999]},  # Med
         "ngu.output_embedding_dim": {"values": [32, 64, 128]},  # Med
         "ngu.kernel_cluster_distance": {"values": [1e-4, 1e-3]},  # Low
-        "baseline_fixed_training_alpha": {"values": [(0.9, 0.1), (0.8, 0.2), (0.7, 0.3)]},  # High
     }
 
 
