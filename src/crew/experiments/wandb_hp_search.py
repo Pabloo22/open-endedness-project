@@ -50,7 +50,11 @@ nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase gener
 with `get_best_generic_params` and `get_best_rnd_config_provisional` and SPARSER VERSION:
 nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
     --method grid  --enable-inner-wandb --fixed-override video_num_episodes=3 --total-timesteps 200_000_000 \
-    --fixed-override use_fixed_world=False >& nohup.out &
+    --fixed-override procedural_generation=False >& nohup.out &
+
+nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
+    --method grid  --enable-inner-wandb --fixed-override video_num_episodes=3 --total-timesteps 200_000_000 \
+    --fixed-override procedural_generation=False --fixed-override rnd.use_inventory_only=True >& nohup.out &
 """
 
 from __future__ import annotations

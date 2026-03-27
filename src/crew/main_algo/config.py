@@ -19,6 +19,7 @@ class RNDConfig:
     output_embedding_dim: int = 256
     head_activation: str = "relu"
     head_hidden_dim: int = 256
+    use_inventory_only: bool = False
 
     predictor_network_lr: float = 1e-4
     predictor_update_epochs: int = 1
