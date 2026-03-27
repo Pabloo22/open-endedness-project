@@ -10,6 +10,8 @@ import jax.numpy as jnp
 
 from crew.networks.encoders import (
     SUPPORTED_ENCODER_MODES as SUPPORTED_OBSERVATION_ENCODER_MODES,
+)
+from crew.networks.encoders import (
     SUPPORTED_STRUCTURED_ENCODER_ENV_IDS,
 )
 
@@ -24,10 +26,11 @@ class RNDConfig:
     predictor_update_epochs: int = 1
     predictor_num_minibatches: int = 64
     num_chunks_in_rewards_computation: int = 64
-    gamma: float = 0.99
+    gamma: float = 0.995
     gae_lambda: float = 0.95
 
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+
 
 @dataclass
 class ICMConfig:
@@ -35,9 +38,9 @@ class ICMConfig:
     activation_fn: str = "relu"
     forward_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
     inverse_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
-    
+
     obs_emb_dim: int = 256
-    
+
     # hyperparams
     lr: float = 1e-4
     reward_eta: float = 0.01
@@ -46,11 +49,13 @@ class ICMConfig:
     num_minibatches: int = 64
     num_chunks_in_rewards_computation: int = 64
     eps: float = 1e-8
-    
+
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    
+
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+
+
 @dataclass
 class NGUConfig:
     output_embedding_dim: int = 64
@@ -70,6 +75,8 @@ class NGUConfig:
     gae_lambda: float = 0.95
 
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+
+
 @dataclass
 class CurriculumConfig:
     score_lp_mode: str = "alp"
@@ -94,7 +101,7 @@ class TrainConfig:
     train_seed: int = 42
     env_id: str = "Craftax-Classic-Symbolic-v1"
     procedural_generation: bool = True
-    fixed_reset_seed: int = 12345
+    fixed_reset_seed: int = 142
     achievement_ids_to_block: Sequence[int] = ()
     remove_health_reward: bool = False
     episode_max_steps: int | None = 3000
@@ -238,7 +245,9 @@ class TrainConfig:
         self.evaluation_alpha_labels = self._build_evaluation_alpha_labels()
 
     def _validate_selected_intrinsic_modules(self):
-        from crew.main_algo.intrinsic_modules.registry import get_registered_intrinsic_module_names
+        from crew.main_algo.intrinsic_modules.registry import (
+            get_registered_intrinsic_module_names,
+        )
 
         registered_names = get_registered_intrinsic_module_names()
         if self.training_mode == "curriculum" and not self.selected_intrinsic_modules:
