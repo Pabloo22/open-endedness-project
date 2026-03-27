@@ -29,6 +29,24 @@ class GymnaxWrapper(object):
         return getattr(self._env, name)
 
 
+class FixedWorldWrapper(GymnaxWrapper):
+    """Wraps an environment to always reset to the exact same world map (and initial state) 
+    by fixing the RNG key used for resets."""
+
+    def __init__(self, env, fixed_seed: int = 42):
+        super().__init__(env)
+        self.fixed_rng = jax.random.PRNGKey(fixed_seed)
+
+    @partial(jax.jit, static_argnums=(0, 2))
+    def reset(self, rng, params=None):
+        # Ignore the passed rng, use the fixed one to guarantee the same map
+        return self._env.reset(self.fixed_rng, params)
+
+    @partial(jax.jit, static_argnums=(0, 4))
+    def step(self, rng, state, action, params=None):
+        return self._env.step(rng, state, action, params)
+
+
 class AutoResetEnvWrapper(GymnaxWrapper):
     """Provides standard auto-reset functionality, providing the same behaviour as Gymnax-default."""
 
@@ -58,6 +76,20 @@ class AutoResetEnvWrapper(GymnaxWrapper):
         obs, state = auto_reset(done, state_re, state_st, obs_re, obs_st)
 
         return obs, state, reward, done, info
+
+
+class FixedResetKeyEnvWrapper(GymnaxWrapper):
+    """Forces every environment reset to reuse the same reset key."""
+
+    def __init__(self, env, fixed_reset_seed: int):
+        super().__init__(env)
+        self.fixed_reset_seed = fixed_reset_seed
+        self._fixed_reset_key = jax.random.key(fixed_reset_seed)
+
+    @partial(jax.jit, static_argnums=(0, 2))
+    def reset(self, key, params=None):
+        del key
+        return self._env.reset(self._fixed_reset_key, params)
 
 
 class OptimisticResetVecEnvWrapper(GymnaxWrapper):
@@ -160,7 +192,12 @@ class SparseCraftaxWrapper(GymnaxWrapper):
     ):
         super().__init__(env)
 
-        if isinstance(env, (CraftaxClassicSymbolicEnv, CraftaxClassicSymbolicEnvNoAutoReset)):
+        if isinstance(env, FixedWorldWrapper):
+            eval_env = env._env
+        else:
+            eval_env = env
+
+        if isinstance(eval_env, (CraftaxClassicSymbolicEnv, CraftaxClassicSymbolicEnvNoAutoReset)):
             num_achievements = len(classic_craftax_constants.Achievement)
             # Classic craftax doesn't have a reward map because its rewards are all 1, so we can just create a mask.
             achievement_reward_map = jnp.ones(num_achievements, dtype=jnp.float32)

@@ -8,13 +8,18 @@ from typing import ClassVar
 
 import jax.numpy as jnp
 
+from crew.networks.encoders import (
+    SUPPORTED_ENCODER_MODES as SUPPORTED_OBSERVATION_ENCODER_MODES,
+    SUPPORTED_STRUCTURED_ENCODER_ENV_IDS,
+)
+
 
 @dataclass
 class RNDConfig:
-    encoder_mode: str = "flat_symbolic"
     output_embedding_dim: int = 256
     head_activation: str = "relu"
     head_hidden_dim: int = 256
+    use_inventory_only: bool = False
 
     predictor_network_lr: float = 1e-4
     predictor_update_epochs: int = 1
@@ -23,10 +28,7 @@ class RNDConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
 
-    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = ("flat_symbolic",)
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
-
-
 
 @dataclass
 class ICMConfig:
@@ -50,11 +52,8 @@ class ICMConfig:
     gae_lambda: float = 0.95
     
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
-
-
 @dataclass
 class NGUConfig:
-    encoder_mode: str = "flat_symbolic"
     output_embedding_dim: int = 64
     head_activation: str = "relu"
     head_hidden_dim: int = 64
@@ -71,10 +70,7 @@ class NGUConfig:
     gamma: float = 0.99
     gae_lambda: float = 0.95
 
-    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = ("flat_symbolic",)
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
-
-
 @dataclass
 class CurriculumConfig:
     score_lp_mode: str = "alp"
@@ -98,6 +94,8 @@ class CurriculumConfig:
 class TrainConfig:
     train_seed: int = 42
     env_id: str = "Craftax-Classic-Symbolic-v1"
+    procedural_generation: bool = True
+    fixed_reset_seed: int = 12345
     achievement_ids_to_block: Sequence[int] = ()
     remove_health_reward: bool = False
     episode_max_steps: int | None = 3000
@@ -133,6 +131,7 @@ class TrainConfig:
     reset_normalization_running_forward_return_on_new_alpha: bool = False
 
     # encoder
+    encoder_mode: str = "flat_symbolic"
     obs_emb_dim: int = 256
 
     # Transformer XL specific
@@ -156,6 +155,9 @@ class TrainConfig:
     use_weighted_value_loss: bool = True
 
     # module selection and module-specific nested config
+    use_fixed_world: bool = False
+    fixed_world_seed: int = 42
+
     selected_intrinsic_modules: tuple[str, ...] = ("rnd",)
     baseline_fixed_training_alpha: tuple[float, ...] | None = None
     num_reward_functions: int = field(init=False)
@@ -194,6 +196,7 @@ class TrainConfig:
     )
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
     SUPPORTED_TRAINING_MODES: ClassVar[tuple[str, ...]] = ("curriculum", "baseline")
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = SUPPORTED_OBSERVATION_ENCODER_MODES
 
     def __post_init__(self):
         if self.training_mode not in self.SUPPORTED_TRAINING_MODES:
@@ -207,6 +210,15 @@ class TrainConfig:
         if self.head_activation not in self.SUPPORTED_HEAD_ACTIVATIONS:
             msg = (
                 f"head_activation must be one of {self.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.head_activation!r}."
+            )
+            raise ValueError(msg)
+        if self.encoder_mode not in self.SUPPORTED_ENCODER_MODES:
+            msg = f"encoder_mode must be one of {self.SUPPORTED_ENCODER_MODES}. Received {self.encoder_mode!r}."
+            raise ValueError(msg)
+        if self.encoder_mode == "craftax_structured" and self.env_id not in SUPPORTED_STRUCTURED_ENCODER_ENV_IDS:
+            msg = (
+                "encoder_mode='craftax_structured' is only supported for "
+                f"{SUPPORTED_STRUCTURED_ENCODER_ENV_IDS}. Received env_id={self.env_id!r}."
             )
             raise ValueError(msg)
 
@@ -286,9 +298,6 @@ class TrainConfig:
     def _validate_selected_module_configs(self):
         # RND-specific static checks; rollout-dependent checks are deferred until phase 2.
         if "rnd" in self.selected_intrinsic_modules:
-            if self.rnd.encoder_mode not in RNDConfig.SUPPORTED_ENCODER_MODES:
-                msg = f"rnd.encoder_mode must be one of {RNDConfig.SUPPORTED_ENCODER_MODES}. Received {self.rnd.encoder_mode!r}."
-                raise ValueError(msg)
             if self.rnd.head_activation not in RNDConfig.SUPPORTED_HEAD_ACTIVATIONS:
                 msg = f"rnd.head_activation must be one of {RNDConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.rnd.head_activation!r}."
                 raise ValueError(msg)

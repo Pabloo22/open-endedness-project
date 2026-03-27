@@ -91,13 +91,15 @@ if __name__ == "__main__":
     # Smoke-friendly local run configuration.
     config = TrainConfig(
         train_seed=1,
+        procedural_generation=False,
+        fixed_reset_seed=101,  # Only used if procedural_generation=False.
         total_timesteps=100_000,
         env_id="Craftax-Classic-Symbolic-v1",
         achievement_ids_to_block=tuple(range(15)),  # Block the first n achievements for testing.
         training_mode="curriculum",  # "curriculum" or "baseline"
         selected_intrinsic_modules=("rnd",),
         baseline_fixed_training_alpha=(0.8, 0.2),  # Only used in baseline mode.
-        num_envs_per_batch=1024,
+        num_envs_per_batch=256,
         num_steps_per_env=512,
         num_steps_per_update=256,
         eval_every_n_batches=2,
@@ -112,7 +114,7 @@ if __name__ == "__main__":
         transformer_hidden_states_dim=128,
         qkv_features=128,
         head_hidden_dim=128,
-        enable_wandb=True,
+        enable_wandb=False,
         is_timing_run=False,
     )
     run_main_algo_training(config=config, save_results=False)

@@ -69,3 +69,20 @@ def get_rnd_search_space_v2() -> dict[str, Any]:
             ]
         },
     }
+
+
+def get_best_rnd_config_provisional() -> dict[str, Any]:
+    """Returns the best known hyperparameter values for the RND module."""
+    return {
+        **get_rnd_base_config_v2(),
+        "rnd.predictor_network_lr": 0.0005,
+        "rnd.predictor_update_epochs": 3,
+        "rnd.predictor_num_minibatches": 32,
+        "rnd.gamma": 0.99,
+        "baseline_fixed_training_alpha": (0.7, 0.3),
+    }
+
+def get_rnd_search_space_for_quick_eval() -> dict[str, Any]:
+    return {
+        "train_seed": {"values": [6, 7, 8, 9, 10]},
+    }

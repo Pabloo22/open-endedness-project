@@ -10,7 +10,7 @@ from crew.main_algo.types import (
     IntrinsicUpdateMetrics,
     TransitionDataBase,
 )
-from crew.networks.encoders import ObsEncoderFlatSymbolic
+from crew.networks.encoders import build_observation_encoder
 
 
 ACTION_DIMS = {
@@ -42,6 +42,8 @@ def mlp(hidden_dims: list[int], out_dim: int, activation=nn.relu) -> nn.Sequenti
 
 class ICMNet(nn.Module):
     """Neural network for the ICM module, containing the observation encoder, forward model, and inverse model."""
+    env_id: str
+    encoder_mode: str
     obs_emb_dim: int
     action_dim: int
     forward_hidden_dims: list[int]
@@ -50,7 +52,11 @@ class ICMNet(nn.Module):
     
     def setup(self):
         """Initialize the encoder, forward network and inverse network of the ICMNet."""
-        self.obs_encoder = ObsEncoderFlatSymbolic(obs_emb_dim=self.obs_emb_dim)
+        self.obs_encoder = build_observation_encoder(
+            encoder_mode=self.encoder_mode,
+            env_id=self.env_id,
+            obs_emb_dim=self.obs_emb_dim,
+        )
         activation_fn = self.get_activation_fn()
         self.forward_net = mlp(self.forward_hidden_dims, self.obs_emb_dim, activation=activation_fn)
         self.inverse_net = mlp(self.inverse_hidden_dims, self.action_dim, activation=activation_fn)
@@ -154,6 +160,8 @@ class ICMIntrinsicModule:
         init_observations = jnp.zeros((1, *obs_shape), dtype=jnp.float32)
         init_actions = jnp.zeros((1,), dtype=jnp.int32)
         icm_net = ICMNet(
+            env_id=config.env_id,
+            encoder_mode=config.encoder_mode,
             activation_fn=config.icm.activation_fn,
             obs_emb_dim=config.icm.obs_emb_dim,
             action_dim=ACTION_DIMS[config.env_id],

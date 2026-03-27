@@ -16,18 +16,27 @@ from crew.main_algo.types import (
     IntrinsicUpdateMetrics,
     TransitionDataBase,
 )
-from crew.networks.encoders import ObsEncoderFlatSymbolic
+from crew.networks.encoders import build_observation_encoder
 
 
 class RNDTargetAndPredictor(nn.Module):
     encoder_mode: str
+    env_id: str
     output_embedding_dim: int
     obs_emb_dim: int
     head_activation: str
     head_hidden_dim: int
+    use_inventory_only: bool = False
 
     def setup(self):
-        self.input_encoder = ObsEncoderFlatSymbolic(obs_emb_dim=self.obs_emb_dim)
+        if not self.use_inventory_only:
+            self.input_encoder = build_observation_encoder(
+                encoder_mode=self.encoder_mode,
+                env_id=self.env_id,
+                obs_emb_dim=self.obs_emb_dim,
+            )
+        else:
+            self.input_encoder = None
 
         if self.head_activation == "relu":
             self.activation_fn = nn.relu
@@ -51,7 +60,29 @@ class RNDTargetAndPredictor(nn.Module):
         )
 
     def __call__(self, observations: jax.Array) -> jax.Array:
-        encoded_input = self.input_encoder(observations=observations)
+        if self.use_inventory_only:
+            from crew.networks.encoders import (
+                CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
+                CRAFTAX_CLASSIC_HEIGHT,
+                CRAFTAX_CLASSIC_WIDTH,
+                CRAFTAX_CLASSIC_MAP_CHANNELS,
+                CRAFTAX_HEIGHT,
+                CRAFTAX_WIDTH,
+                CRAFTAX_MAP_CHANNELS,
+            )
+
+            if self.env_id == CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID:
+                flat_map_dim = CRAFTAX_CLASSIC_HEIGHT * CRAFTAX_CLASSIC_WIDTH * CRAFTAX_CLASSIC_MAP_CHANNELS
+                inventory_dim = 12
+            else:
+                flat_map_dim = CRAFTAX_HEIGHT * CRAFTAX_WIDTH * CRAFTAX_MAP_CHANNELS
+                inventory_dim = 16
+
+            # The observation is flat, map comes first, then extra features. The inventory is the first part of extra features.
+            encoded_input = observations[..., flat_map_dim : flat_map_dim + inventory_dim]
+        else:
+            encoded_input = self.input_encoder(observations=observations)
+
         outputs = self.linear1(encoded_input)
         outputs = self.activation_fn(outputs)
         outputs = self.linear2(outputs)
@@ -177,11 +208,13 @@ class RNDIntrinsicModule:
     ) -> RNDModuleState:
         init_obs = jnp.zeros((2, *obs_shape), dtype=jnp.float32)
         network = RNDTargetAndPredictor(
-            encoder_mode=config.rnd.encoder_mode,
+            encoder_mode=config.encoder_mode,
+            env_id=config.env_id,
             output_embedding_dim=config.rnd.output_embedding_dim,
             obs_emb_dim=config.obs_emb_dim,
             head_activation=config.rnd.head_activation,
             head_hidden_dim=config.rnd.head_hidden_dim,
+            use_inventory_only=config.rnd.use_inventory_only,
         )
 
         predictor_rng, target_rng = jax.random.split(rng, 2)

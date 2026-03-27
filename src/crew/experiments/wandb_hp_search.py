@@ -46,6 +46,15 @@ with `get_best_generic_params`:
 nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid  \
     --enable-inner-wandb --fixed-override video_num_episodes=5 --total-timesteps 1_000_000_000 \
     --sweep-id pp976ug7 >& nohup.out &
+
+with `get_best_generic_params` and `get_best_rnd_config_provisional` and SPARSER VERSION:
+nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
+    --method grid  --enable-inner-wandb --fixed-override video_num_episodes=3 --total-timesteps 200_000_000 \
+    --fixed-override procedural_generation=False >& nohup.out &
+
+nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
+    --method grid  --enable-inner-wandb --fixed-override video_num_episodes=3 --total-timesteps 200_000_000 \
+    --fixed-override procedural_generation=False --fixed-override rnd.use_inventory_only=True >& nohup.out &
 """
 
 from __future__ import annotations
@@ -203,9 +212,7 @@ def parse_args() -> argparse.Namespace:
             "Use one or more modules for the curriculum phase, for example --intrinsic-modules rnd icm."
         ),
     )
-    parser.add_argument(
-        "--train-seed", type=int, default=0, help="Base seed used for setting the seed of each trial."
-    )
+    parser.add_argument("--train-seed", type=int, default=0, help="Base seed used for setting the seed of each trial.")
     parser.add_argument(
         "--total-timesteps",
         type=int,

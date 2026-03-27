@@ -21,8 +21,10 @@ from crew.main_algo.types import (
     RewardNormalizationStats,
 )
 from crew.main_algo.wrappers import (
+    FixedResetKeyEnvWrapper,
     OptimisticResetVecEnvWrapper,
     SparseCraftaxWrapper,
+    FixedWorldWrapper,
 )
 
 
@@ -49,6 +51,8 @@ def setup_actor_critic_train_state(
         num_actions=num_actions,
         num_reward_functions=config.num_reward_functions,
         # observation encoder
+        env_id=config.env_id,
+        encoder_mode=config.encoder_mode,
         obs_emb_dim=config.obs_emb_dim,
         # transformer
         hidden_dim=config.transformer_hidden_states_dim,
@@ -168,6 +172,9 @@ def set_up_for_training(
 
     # Environment setup.
     base_env = make_craftax_env_from_name(config.env_id, auto_reset=False)
+    if config.use_fixed_world:
+        base_env = FixedWorldWrapper(base_env, fixed_seed=config.fixed_world_seed)
+
     env_params = base_env.default_params
     if config.episode_max_steps is not None:
         env_params = env_params.replace(max_timesteps=config.episode_max_steps)
@@ -176,9 +183,19 @@ def set_up_for_training(
         blocked_achievement_ids=config.achievement_ids_to_block,
         remove_health_reward=config.remove_health_reward,
     )
+    if not config.procedural_generation:
+        base_env = FixedResetKeyEnvWrapper(
+            base_env,
+            fixed_reset_seed=config.fixed_reset_seed,
+        )
+    reset_ratio_limit = (
+        config.num_envs_per_batch
+        if not config.procedural_generation
+        else config.optimistic_reset_ratio_limit
+    )
     reset_ratio = _resolve_optimistic_reset_ratio(
         num_envs=config.num_envs_per_batch,
-        ratio_limit=config.optimistic_reset_ratio_limit,
+        ratio_limit=reset_ratio_limit,
     )
     env = OptimisticResetVecEnvWrapper(
         base_env,

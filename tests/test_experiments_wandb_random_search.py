@@ -81,6 +81,28 @@ class TestWandbRandomSearch(unittest.TestCase):
         trial_config = build_trial_config_from_overrides(base_config, {"train_seed": 123})
 
         self.assertEqual(trial_config.train_seed, 123)
+        self.assertEqual(trial_config.fixed_reset_seed, 12345)
+
+    def test_build_trial_config_from_overrides_updates_fixed_reset_seed_independently(self):
+        base_config = build_base_tuning_config(
+            tuning_phase=TUNING_PHASE_GENERIC,
+            project="proj",
+            entity=None,
+            group=None,
+            train_seed=7,
+            total_timesteps=2048,
+        )
+
+        trial_config = build_trial_config_from_overrides(
+            base_config,
+            {
+                "train_seed": 123,
+                "fixed_reset_seed": 777,
+            },
+        )
+
+        self.assertEqual(trial_config.train_seed, 123)
+        self.assertEqual(trial_config.fixed_reset_seed, 777)
 
     def test_derive_trial_seed_is_deterministic_and_unique_per_run(self):
         first_seed = _derive_trial_seed(base_seed=11, run_id="abc123")
