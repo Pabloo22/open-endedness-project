@@ -57,6 +57,7 @@ class NGUConfig:
     output_embedding_dim: int = 64
     head_activation: str = "relu"
     head_hidden_dim: int = 64
+    use_inventory_only: bool = False
 
     episodic_memory_capacity: int = 4096  # was 1000
     num_neighbors: int = 10
