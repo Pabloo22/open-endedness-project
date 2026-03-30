@@ -12,6 +12,7 @@ from crew.networks.encoders import (
     SUPPORTED_ENCODER_MODES as SUPPORTED_OBSERVATION_ENCODER_MODES,
 )
 from crew.networks.encoders import (
+    SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS,
     SUPPORTED_STRUCTURED_ENCODER_ENV_IDS,
 )
 
@@ -387,10 +388,16 @@ class TrainConfig:
         if encoder_mode not in self.SUPPORTED_ENCODER_MODES:
             msg = f"{field_name} must be one of {self.SUPPORTED_ENCODER_MODES}. Received {encoder_mode!r}."
             raise ValueError(msg)
-        if encoder_mode in ("craftax_structured", "inventory_only") and self.env_id not in SUPPORTED_STRUCTURED_ENCODER_ENV_IDS:
+        if encoder_mode == "craftax_structured" and self.env_id not in SUPPORTED_STRUCTURED_ENCODER_ENV_IDS:
             msg = (
                 f"{field_name}={encoder_mode!r} is only supported for "
                 f"{SUPPORTED_STRUCTURED_ENCODER_ENV_IDS}. Received env_id={self.env_id!r}."
+            )
+            raise ValueError(msg)
+        if encoder_mode == "inventory_only" and self.env_id not in SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS:
+            msg = (
+                f"{field_name}={encoder_mode!r} is only supported for "
+                f"{SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS}. Received env_id={self.env_id!r}."
             )
             raise ValueError(msg)
 

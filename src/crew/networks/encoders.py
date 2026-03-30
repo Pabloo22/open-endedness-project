@@ -15,6 +15,7 @@ SUPPORTED_STRUCTURED_ENCODER_ENV_IDS = (
     CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
     CRAFTAX_SYMBOLIC_ENV_ID,
 )
+SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS = (CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,)
 SUPPORTED_ENCODER_MODES = ("flat_symbolic", "craftax_structured", "inventory_only")
 
 CRAFTAX_CLASSIC_HEIGHT = 7
@@ -35,7 +36,6 @@ CRAFTAX_ITEM_TOKENS = 5
 CRAFTAX_ACTOR_CHANNELS = 40
 CRAFTAX_EXTRA_FEATURES_DIM = 51
 CRAFTAX_MAP_CHANNELS = CRAFTAX_BLOCK_TOKENS + CRAFTAX_ITEM_TOKENS + CRAFTAX_ACTOR_CHANNELS + 1
-CRAFTAX_INVENTORY_DIM = 16
 CRAFTAX_TOTAL_OBS_DIM = CRAFTAX_HEIGHT * CRAFTAX_WIDTH * CRAFTAX_MAP_CHANNELS + CRAFTAX_EXTRA_FEATURES_DIM
 
 
@@ -58,13 +58,9 @@ def extract_inventory_from_flat_craftax_symbolic_observation(
         flat_map_dim = CRAFTAX_CLASSIC_HEIGHT * CRAFTAX_CLASSIC_WIDTH * CRAFTAX_CLASSIC_MAP_CHANNELS
         return observations[..., flat_map_dim : flat_map_dim + CRAFTAX_CLASSIC_INVENTORY_DIM].astype(jnp.float32)
 
-    if env_id == CRAFTAX_SYMBOLIC_ENV_ID:
-        flat_map_dim = CRAFTAX_HEIGHT * CRAFTAX_WIDTH * CRAFTAX_MAP_CHANNELS
-        return observations[..., flat_map_dim : flat_map_dim + CRAFTAX_INVENTORY_DIM].astype(jnp.float32)
-
     msg = (
         "Inventory-only Craftax observation encoder only supports "
-        f"{SUPPORTED_STRUCTURED_ENCODER_ENV_IDS}. Received env_id={env_id!r}."
+        f"{SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS}. Received env_id={env_id!r}."
     )
     raise ValueError(msg)
 
@@ -315,10 +311,10 @@ def build_observation_encoder(
             obs_emb_dim=obs_emb_dim,
         )
     if encoder_mode == "inventory_only":
-        if env_id not in SUPPORTED_STRUCTURED_ENCODER_ENV_IDS:
+        if env_id not in SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS:
             msg = (
                 "Inventory-only Craftax observation encoder only supports "
-                f"{SUPPORTED_STRUCTURED_ENCODER_ENV_IDS}. Received env_id={env_id!r}."
+                f"{SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS}. Received env_id={env_id!r}."
             )
             raise ValueError(msg)
         return ObsEncoderInventoryOnly(

@@ -160,34 +160,38 @@ class TestCraftaxStructuredEncoder(unittest.TestCase):
 
 class TestInventoryOnlyEncoder(unittest.TestCase):
     def test_inventory_slice_matches_the_first_extra_features(self):
-        for env_id in (CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID, CRAFTAX_SYMBOLIC_ENV_ID):
-            with self.subTest(env_id=env_id):
-                layout = _layout(env_id)
-                observations = _build_flat_obs(env_id=env_id, visible_cells=[])
-                inventory = extract_inventory_from_flat_craftax_symbolic_observation(observations, env_id)
-                np.testing.assert_allclose(
-                    np.asarray(inventory[0]),
-                    np.arange(layout["inventory_dim"], dtype=np.float32),
-                )
+        layout = _layout(CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
+        observations = _build_flat_obs(env_id=CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID, visible_cells=[])
+        inventory = extract_inventory_from_flat_craftax_symbolic_observation(observations, CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
+        np.testing.assert_allclose(
+            np.asarray(inventory[0]),
+            np.arange(layout["inventory_dim"], dtype=np.float32),
+        )
 
     def test_inventory_only_encoder_preserves_leading_batch_dims_and_jits(self):
-        for env_id in (CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID, CRAFTAX_SYMBOLIC_ENV_ID):
-            with self.subTest(env_id=env_id):
-                layout = _layout(env_id)
-                encoder = build_observation_encoder(
-                    encoder_mode="inventory_only",
-                    env_id=env_id,
-                    obs_emb_dim=32,
-                )
-                observations = jnp.zeros((2, 3, layout["total_obs_dim"]), dtype=jnp.float32)
-                params = encoder.init(jax.random.key(5), observations)
+        layout = _layout(CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
+        encoder = build_observation_encoder(
+            encoder_mode="inventory_only",
+            env_id=CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
+            obs_emb_dim=32,
+        )
+        observations = jnp.zeros((2, 3, layout["total_obs_dim"]), dtype=jnp.float32)
+        params = encoder.init(jax.random.key(5), observations)
 
-                outputs = encoder.apply(params, observations)
-                self.assertEqual(outputs.shape, (2, 3, 32))
+        outputs = encoder.apply(params, observations)
+        self.assertEqual(outputs.shape, (2, 3, 32))
 
-                jitted_apply = jax.jit(lambda x: encoder.apply(params, x))
-                jitted_outputs = jitted_apply(observations)
-                self.assertEqual(jitted_outputs.shape, (2, 3, 32))
+        jitted_apply = jax.jit(lambda x: encoder.apply(params, x))
+        jitted_outputs = jitted_apply(observations)
+        self.assertEqual(jitted_outputs.shape, (2, 3, 32))
+
+    def test_inventory_only_encoder_is_not_supported_for_full_craftax(self):
+        with self.assertRaises(ValueError):
+            build_observation_encoder(
+                encoder_mode="inventory_only",
+                env_id=CRAFTAX_SYMBOLIC_ENV_ID,
+                obs_emb_dim=32,
+            )
 
 
 class TestStructuredEncoderIntegration(unittest.TestCase):

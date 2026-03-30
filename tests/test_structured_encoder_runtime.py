@@ -311,43 +311,41 @@ class TestStructuredEncoderTrainingSmoke(unittest.TestCase):
                 self.assertIn("eval/returns", out["metrics"])
                 self.assertEqual(out["metrics"]["run/batch_idx"].shape[0], config.num_batches_of_envs)
 
-    def test_full_training_runs_with_inventory_only_actor_encoder_for_both_symbolic_envs(self):
-        for env_id in (CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID, CRAFTAX_SYMBOLIC_ENV_ID):
-            with self.subTest(env_id=env_id):
-                kwargs = _base_small_config_kwargs(env_id)
-                kwargs["encoder_mode"] = "inventory_only"
-                config = TrainConfig(
-                    **kwargs,
-                    training_mode="baseline",
-                    selected_intrinsic_modules=(),
-                    baseline_fixed_training_alpha=(1.0,),
-                )
-                (
-                    rng,
-                    env,
-                    env_params,
-                    agent_train_state,
-                    reward_normalization_stats,
-                    intrinsic_modules,
-                    intrinsic_states,
-                    curriculum_state,
-                ) = set_up_for_training(config)
+    def test_full_training_runs_with_inventory_only_actor_encoder_for_classic_craftax(self):
+        kwargs = _base_small_config_kwargs(CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
+        kwargs["encoder_mode"] = "inventory_only"
+        config = TrainConfig(
+            **kwargs,
+            training_mode="baseline",
+            selected_intrinsic_modules=(),
+            baseline_fixed_training_alpha=(1.0,),
+        )
+        (
+            rng,
+            env,
+            env_params,
+            agent_train_state,
+            reward_normalization_stats,
+            intrinsic_modules,
+            intrinsic_states,
+            curriculum_state,
+        ) = set_up_for_training(config)
 
-                out = jax.block_until_ready(
-                    full_training(
-                        rng=rng,
-                        agent_train_state=agent_train_state,
-                        reward_normalization_stats=reward_normalization_stats,
-                        intrinsic_states=intrinsic_states,
-                        curriculum_state=curriculum_state,
-                        env=env,
-                        env_params=env_params,
-                        intrinsic_modules=intrinsic_modules,
-                        config=config,
-                    )
-                )
-                self.assertIn("metrics", out)
-                self.assertIn("eval/returns", out["metrics"])
+        out = jax.block_until_ready(
+            full_training(
+                rng=rng,
+                agent_train_state=agent_train_state,
+                reward_normalization_stats=reward_normalization_stats,
+                intrinsic_states=intrinsic_states,
+                curriculum_state=curriculum_state,
+                env=env,
+                env_params=env_params,
+                intrinsic_modules=intrinsic_modules,
+                config=config,
+            )
+        )
+        self.assertIn("metrics", out)
+        self.assertIn("eval/returns", out["metrics"])
 
 
 if __name__ == "__main__":

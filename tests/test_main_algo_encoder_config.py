@@ -42,6 +42,14 @@ class TestMainAlgoEncoderConfig(unittest.TestCase):
         )
         self.assertEqual(config.encoder_mode, "inventory_only")
 
+    def test_inventory_only_encoder_mode_is_not_supported_for_full_craftax(self):
+        with self.assertRaises(ValueError):
+            TrainConfig(
+                **_base_config_kwargs(),
+                env_id="Craftax-Symbolic-v1",
+                encoder_mode="inventory_only",
+            )
+
     def test_invalid_encoder_mode_raises(self):
         with self.assertRaises(ValueError):
             TrainConfig(
@@ -67,6 +75,14 @@ class TestMainAlgoEncoderConfig(unittest.TestCase):
             TrainConfig(
                 **_base_config_kwargs(),
                 rnd=RNDConfig(encoder_mode="not_a_real_mode"),
+            )
+
+    def test_inventory_only_intrinsic_encoder_is_not_supported_for_full_craftax(self):
+        with self.assertRaises(ValueError):
+            TrainConfig(
+                **_base_config_kwargs(),
+                env_id="Craftax-Symbolic-v1",
+                rnd=RNDConfig(encoder_mode="inventory_only"),
             )
 
     def test_use_inventory_only_flags_are_not_supported(self):
