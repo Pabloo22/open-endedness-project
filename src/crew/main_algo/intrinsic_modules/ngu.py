@@ -142,7 +142,7 @@ class NGUIntrinsicModule:
     ) -> NGUModuleState:
         init_obs = jnp.zeros((2, *obs_shape), dtype=jnp.float32)
         network = NGUEmbeddingNetwork(
-            encoder_mode=config.encoder_mode,
+            encoder_mode=config.ngu.encoder_mode,
             env_id=config.env_id,
             output_embedding_dim=config.ngu.output_embedding_dim,
             obs_emb_dim=config.obs_emb_dim,

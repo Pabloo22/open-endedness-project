@@ -113,6 +113,7 @@ def _build_intrinsic_module_config(module_name: str, env_id: str = CRAFTAX_CLASS
     kwargs = _base_small_config_kwargs(env_id)
     kwargs["selected_intrinsic_modules"] = (module_name,)
     kwargs["rnd"] = RNDConfig(
+        encoder_mode="craftax_structured",
         output_embedding_dim=16,
         head_hidden_dim=16,
         predictor_update_epochs=1,
@@ -120,6 +121,7 @@ def _build_intrinsic_module_config(module_name: str, env_id: str = CRAFTAX_CLASS
         num_chunks_in_rewards_computation=4,
     )
     kwargs["ngu"] = NGUConfig(
+        encoder_mode="craftax_structured",
         output_embedding_dim=16,
         head_hidden_dim=16,
         episodic_memory_capacity=4,
@@ -128,6 +130,43 @@ def _build_intrinsic_module_config(module_name: str, env_id: str = CRAFTAX_CLASS
         num_chunks_in_rewards_computation=4,
     )
     kwargs["icm"] = ICMConfig(
+        encoder_mode="craftax_structured",
+        forward_hidden_dims=[16],
+        inverse_hidden_dims=[16],
+        obs_emb_dim=16,
+        update_epochs=1,
+        num_minibatches=4,
+        num_chunks_in_rewards_computation=4,
+    )
+    return TrainConfig(**kwargs)
+
+
+def _build_inventory_only_intrinsic_config(
+    module_name: str,
+    env_id: str = CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
+) -> TrainConfig:
+    kwargs = _base_small_config_kwargs(env_id)
+    kwargs["encoder_mode"] = "flat_symbolic"
+    kwargs["selected_intrinsic_modules"] = (module_name,)
+    kwargs["rnd"] = RNDConfig(
+        encoder_mode="inventory_only",
+        output_embedding_dim=16,
+        head_hidden_dim=16,
+        predictor_update_epochs=1,
+        predictor_num_minibatches=4,
+        num_chunks_in_rewards_computation=4,
+    )
+    kwargs["ngu"] = NGUConfig(
+        encoder_mode="inventory_only",
+        output_embedding_dim=16,
+        head_hidden_dim=16,
+        episodic_memory_capacity=4,
+        num_neighbors=2,
+        embedding_num_minibatches=4,
+        num_chunks_in_rewards_computation=4,
+    )
+    kwargs["icm"] = ICMConfig(
+        encoder_mode="inventory_only",
         forward_hidden_dims=[16],
         inverse_hidden_dims=[16],
         obs_emb_dim=16,
@@ -214,6 +253,25 @@ class TestStructuredEncoderIntrinsicModuleSmoke(unittest.TestCase):
                 for metric_value in metrics.values():
                     self.assertTrue(bool(jnp.all(jnp.isfinite(metric_value))))
 
+    def test_intrinsic_modules_compute_rewards_and_update_with_inventory_only_encoder(self):
+        for module_name in ("rnd", "ngu", "icm"):
+            with self.subTest(module_name=module_name):
+                config = _build_inventory_only_intrinsic_config(module_name)
+                obs_shape = (_layout(config.env_id)["total_obs_dim"],)
+                rollout, update_data = _make_intrinsic_transitions(config)
+                module = get_intrinsic_module(module_name)
+
+                rng = jax.random.key(1)
+                state = module.init_state(rng, obs_shape, config)
+                rewards = module.compute_rewards(rng, state, rollout, config)
+                updated_state, metrics = module.update(rng, state, update_data, config)
+
+                del updated_state
+                self.assertEqual(rewards.shape, (config.num_steps_per_update, config.num_envs_per_batch))
+                self.assertTrue(bool(jnp.all(jnp.isfinite(rewards))))
+                for metric_value in metrics.values():
+                    self.assertTrue(bool(jnp.all(jnp.isfinite(metric_value))))
+
 
 class TestStructuredEncoderTrainingSmoke(unittest.TestCase):
     def test_full_training_runs_with_structured_encoder_for_both_symbolic_envs(self):
@@ -252,6 +310,44 @@ class TestStructuredEncoderTrainingSmoke(unittest.TestCase):
                 self.assertIn("metrics", out)
                 self.assertIn("eval/returns", out["metrics"])
                 self.assertEqual(out["metrics"]["run/batch_idx"].shape[0], config.num_batches_of_envs)
+
+    def test_full_training_runs_with_inventory_only_actor_encoder_for_both_symbolic_envs(self):
+        for env_id in (CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID, CRAFTAX_SYMBOLIC_ENV_ID):
+            with self.subTest(env_id=env_id):
+                kwargs = _base_small_config_kwargs(env_id)
+                kwargs["encoder_mode"] = "inventory_only"
+                config = TrainConfig(
+                    **kwargs,
+                    training_mode="baseline",
+                    selected_intrinsic_modules=(),
+                    baseline_fixed_training_alpha=(1.0,),
+                )
+                (
+                    rng,
+                    env,
+                    env_params,
+                    agent_train_state,
+                    reward_normalization_stats,
+                    intrinsic_modules,
+                    intrinsic_states,
+                    curriculum_state,
+                ) = set_up_for_training(config)
+
+                out = jax.block_until_ready(
+                    full_training(
+                        rng=rng,
+                        agent_train_state=agent_train_state,
+                        reward_normalization_stats=reward_normalization_stats,
+                        intrinsic_states=intrinsic_states,
+                        curriculum_state=curriculum_state,
+                        env=env,
+                        env_params=env_params,
+                        intrinsic_modules=intrinsic_modules,
+                        config=config,
+                    )
+                )
+                self.assertIn("metrics", out)
+                self.assertIn("eval/returns", out["metrics"])
 
 
 if __name__ == "__main__":

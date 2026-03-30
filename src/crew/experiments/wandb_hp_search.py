@@ -54,7 +54,7 @@ nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intri
 
 nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
     --method grid  --enable-inner-wandb --fixed-override video_num_episodes=3 --total-timesteps 200_000_000 \
-    --fixed-override procedural_generation=False --fixed-override rnd.use_inventory_only=True >& nohup.out &
+    --fixed-override procedural_generation=False --fixed-override rnd.encoder_mode=inventory_only >& nohup.out &
 """
 
 from __future__ import annotations

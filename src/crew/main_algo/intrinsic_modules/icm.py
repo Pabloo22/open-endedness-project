@@ -161,7 +161,7 @@ class ICMIntrinsicModule:
         init_actions = jnp.zeros((1,), dtype=jnp.int32)
         icm_net = ICMNet(
             env_id=config.env_id,
-            encoder_mode=config.encoder_mode,
+            encoder_mode=config.icm.encoder_mode,
             activation_fn=config.icm.activation_fn,
             obs_emb_dim=config.icm.obs_emb_dim,
             action_dim=ACTION_DIMS[config.env_id],

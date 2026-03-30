@@ -12,7 +12,7 @@ from flax.training import orbax_utils
 from crew.experiments.constants import CRAFTAX_CLASSIC_INTERMEDIATE_ACHIEVEMENT_IDS
 from crew.experiments.paths import build_trained_weights_path
 from crew.main_algo.baseline_main_loop import full_training_baseline
-from crew.main_algo.config import TrainConfig
+from crew.main_algo.config import RNDConfig, TrainConfig
 from crew.main_algo.main_loop import full_training
 from crew.main_algo.setups import set_up_for_training
 
@@ -32,6 +32,7 @@ def build_smoke_run_config() -> TrainConfig:
         selected_intrinsic_modules=("rnd",),
         baseline_fixed_training_alpha=(0.8, 0.2),
         encoder_mode="craftax_structured",
+        rnd=RNDConfig(encoder_mode="craftax_structured"),
         num_envs_per_batch=256,
         num_steps_per_env=2048,
         num_steps_per_update=256,
@@ -73,6 +74,7 @@ def build_training_run_config() -> TrainConfig:
         selected_intrinsic_modules=("rnd",),
         baseline_fixed_training_alpha=(0.8, 0.2),
         encoder_mode="craftax_structured",
+        rnd=RNDConfig(encoder_mode="craftax_structured"),
         num_envs_per_batch=1024,
         num_steps_per_env=8192,
         num_steps_per_update=512,

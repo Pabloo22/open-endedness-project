@@ -18,6 +18,7 @@ from crew.networks.encoders import (
 
 @dataclass
 class RNDConfig:
+    encoder_mode: str = "flat_symbolic"
     output_embedding_dim: int = 256
     head_activation: str = "relu"
     head_hidden_dim: int = 256
@@ -30,11 +31,13 @@ class RNDConfig:
     gae_lambda: float = 0.95
 
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = SUPPORTED_OBSERVATION_ENCODER_MODES
 
 
 @dataclass
 class ICMConfig:
     # NN configuration
+    encoder_mode: str = "flat_symbolic"
     activation_fn: str = "relu"
     forward_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
     inverse_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
@@ -54,10 +57,12 @@ class ICMConfig:
     gae_lambda: float = 0.95
 
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = SUPPORTED_OBSERVATION_ENCODER_MODES
 
 
 @dataclass
 class NGUConfig:
+    encoder_mode: str = "flat_symbolic"
     output_embedding_dim: int = 64
     head_activation: str = "relu"
     head_hidden_dim: int = 64
@@ -75,6 +80,7 @@ class NGUConfig:
     gae_lambda: float = 0.95
 
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = SUPPORTED_OBSERVATION_ENCODER_MODES
 
 
 @dataclass
@@ -136,7 +142,7 @@ class TrainConfig:
     reward_norm_clip: float | None = None
     reset_normalization_running_forward_return_on_new_alpha: bool = False
 
-    # encoder
+    # actor-critic observation encoder
     encoder_mode: str = "flat_symbolic"
     obs_emb_dim: int = 256
 
@@ -215,15 +221,7 @@ class TrainConfig:
                 f"head_activation must be one of {self.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.head_activation!r}."
             )
             raise ValueError(msg)
-        if self.encoder_mode not in self.SUPPORTED_ENCODER_MODES:
-            msg = f"encoder_mode must be one of {self.SUPPORTED_ENCODER_MODES}. Received {self.encoder_mode!r}."
-            raise ValueError(msg)
-        if self.encoder_mode == "craftax_structured" and self.env_id not in SUPPORTED_STRUCTURED_ENCODER_ENV_IDS:
-            msg = (
-                "encoder_mode='craftax_structured' is only supported for "
-                f"{SUPPORTED_STRUCTURED_ENCODER_ENV_IDS}. Received env_id={self.env_id!r}."
-            )
-            raise ValueError(msg)
+        self._validate_encoder_mode(self.encoder_mode, "encoder_mode")
 
         self._validate_selected_intrinsic_modules()
         self._validate_training_layout()
@@ -303,6 +301,7 @@ class TrainConfig:
     def _validate_selected_module_configs(self):
         # RND-specific static checks; rollout-dependent checks are deferred until phase 2.
         if "rnd" in self.selected_intrinsic_modules:
+            self._validate_encoder_mode(self.rnd.encoder_mode, "rnd.encoder_mode")
             if self.rnd.head_activation not in RNDConfig.SUPPORTED_HEAD_ACTIVATIONS:
                 msg = f"rnd.head_activation must be one of {RNDConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.rnd.head_activation!r}."
                 raise ValueError(msg)
@@ -324,6 +323,7 @@ class TrainConfig:
                 raise ValueError(msg)
 
         if "icm" in self.selected_intrinsic_modules:
+            self._validate_encoder_mode(self.icm.encoder_mode, "icm.encoder_mode")
             if self.icm.beta < 0.0 or self.icm.beta > 1.0:
                 msg = f"icm.beta must be in [0, 1]. Received {self.icm.beta}."
                 raise ValueError(msg)
@@ -351,6 +351,7 @@ class TrainConfig:
                 raise ValueError(msg)
 
         if "ngu" in self.selected_intrinsic_modules:
+            self._validate_encoder_mode(self.ngu.encoder_mode, "ngu.encoder_mode")
             if self.ngu.head_activation not in NGUConfig.SUPPORTED_HEAD_ACTIVATIONS:
                 msg = f"ngu.head_activation must be one of {NGUConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.ngu.head_activation!r}."
                 raise ValueError(msg)
@@ -381,6 +382,17 @@ class TrainConfig:
                     "otherwise observations will be silently overwritten mid-episode."
                 )
                 raise ValueError(msg)
+
+    def _validate_encoder_mode(self, encoder_mode: str, field_name: str) -> None:
+        if encoder_mode not in self.SUPPORTED_ENCODER_MODES:
+            msg = f"{field_name} must be one of {self.SUPPORTED_ENCODER_MODES}. Received {encoder_mode!r}."
+            raise ValueError(msg)
+        if encoder_mode in ("craftax_structured", "inventory_only") and self.env_id not in SUPPORTED_STRUCTURED_ENCODER_ENV_IDS:
+            msg = (
+                f"{field_name}={encoder_mode!r} is only supported for "
+                f"{SUPPORTED_STRUCTURED_ENCODER_ENV_IDS}. Received env_id={self.env_id!r}."
+            )
+            raise ValueError(msg)
 
     def _apply_mode_specific_overrides(self):
         if self.training_mode == "baseline":

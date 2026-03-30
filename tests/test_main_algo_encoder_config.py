@@ -1,6 +1,6 @@
 import unittest
 
-from crew.main_algo.config import NGUConfig, RNDConfig, TrainConfig
+from crew.main_algo.config import ICMConfig, NGUConfig, RNDConfig, TrainConfig
 
 
 def _base_config_kwargs() -> dict:
@@ -24,6 +24,9 @@ class TestMainAlgoEncoderConfig(unittest.TestCase):
     def test_encoder_mode_defaults_to_flat_symbolic(self):
         config = TrainConfig(**_base_config_kwargs())
         self.assertEqual(config.encoder_mode, "flat_symbolic")
+        self.assertEqual(config.rnd.encoder_mode, "flat_symbolic")
+        self.assertEqual(config.ngu.encoder_mode, "flat_symbolic")
+        self.assertEqual(config.icm.encoder_mode, "flat_symbolic")
 
     def test_craftax_structured_encoder_mode_is_supported(self):
         config = TrainConfig(
@@ -32,6 +35,13 @@ class TestMainAlgoEncoderConfig(unittest.TestCase):
         )
         self.assertEqual(config.encoder_mode, "craftax_structured")
 
+    def test_inventory_only_encoder_mode_is_supported(self):
+        config = TrainConfig(
+            **_base_config_kwargs(),
+            encoder_mode="inventory_only",
+        )
+        self.assertEqual(config.encoder_mode, "inventory_only")
+
     def test_invalid_encoder_mode_raises(self):
         with self.assertRaises(ValueError):
             TrainConfig(
@@ -39,12 +49,32 @@ class TestMainAlgoEncoderConfig(unittest.TestCase):
                 encoder_mode="not_a_real_mode",
             )
 
-    def test_nested_intrinsic_encoder_mode_fields_are_removed(self):
+    def test_intrinsic_modules_accept_their_own_encoder_modes(self):
+        config = TrainConfig(
+            **_base_config_kwargs(),
+            encoder_mode="craftax_structured",
+            rnd=RNDConfig(encoder_mode="inventory_only"),
+            ngu=NGUConfig(encoder_mode="flat_symbolic"),
+            icm=ICMConfig(encoder_mode="inventory_only"),
+        )
+        self.assertEqual(config.encoder_mode, "craftax_structured")
+        self.assertEqual(config.rnd.encoder_mode, "inventory_only")
+        self.assertEqual(config.ngu.encoder_mode, "flat_symbolic")
+        self.assertEqual(config.icm.encoder_mode, "inventory_only")
+
+    def test_invalid_intrinsic_encoder_mode_raises(self):
+        with self.assertRaises(ValueError):
+            TrainConfig(
+                **_base_config_kwargs(),
+                rnd=RNDConfig(encoder_mode="not_a_real_mode"),
+            )
+
+    def test_use_inventory_only_flags_are_not_supported(self):
         with self.assertRaises(TypeError):
-            RNDConfig(encoder_mode="flat_symbolic")
+            RNDConfig(use_inventory_only=True)
 
         with self.assertRaises(TypeError):
-            NGUConfig(encoder_mode="flat_symbolic")
+            NGUConfig(use_inventory_only=True)
 
 
 if __name__ == "__main__":

@@ -182,7 +182,7 @@ class RNDIntrinsicModule:
     ) -> RNDModuleState:
         init_obs = jnp.zeros((2, *obs_shape), dtype=jnp.float32)
         network = RNDTargetAndPredictor(
-            encoder_mode=config.encoder_mode,
+            encoder_mode=config.rnd.encoder_mode,
             env_id=config.env_id,
             output_embedding_dim=config.rnd.output_embedding_dim,
             obs_emb_dim=config.obs_emb_dim,
