@@ -69,3 +69,24 @@ def get_ngu_search_space_v2() -> dict[str, Any]:
             ]
         },
     }
+
+
+def get_best_ngu_config_provisional() -> dict[str, Any]:
+    """Returns the best known hyperparameter values for the NGU module.
+
+    Fixates v2 base params + inventory-only mode + alpha matched to RND
+    for controlled comparison on sparse env.
+    """
+    return {
+        **get_ngu_base_config_v2(),
+        "ngu.use_inventory_only": True,
+        "ngu.gamma": 0.999,
+        "ngu.kernel_cluster_distance": 1e-4,
+        "baseline_fixed_training_alpha": (0.7, 0.3),
+    }
+
+
+def get_ngu_search_space_for_quick_eval() -> dict[str, Any]:
+    return {
+        "train_seed": {"values": [6, 7, 8, 9, 10]},
+    }
