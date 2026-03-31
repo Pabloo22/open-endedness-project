@@ -49,7 +49,7 @@ class TestMainAlgoEvalConfig(unittest.TestCase):
             rtol=0,
             atol=1e-6,
         )
-        self.assertEqual(config.evaluation_alpha_labels, ("ext10_rnd00",))
+        self.assertEqual(config.evaluation_alpha_labels, ("ext1_rnd0",))
 
     def test_eval_num_episodes_is_set(self):
         config = TrainConfig(
@@ -115,21 +115,21 @@ class TestMainAlgoEvalConfig(unittest.TestCase):
     def test_default_evaluation_alpha_labels_are_derived_from_alphas(self):
         config = TrainConfig(
             **_base_config_kwargs(),
-            evaluation_alphas=((0.8, 0.2), (0.0, 1.0), (1.0, 0.0)),
+            evaluation_alphas=((0.875, 0.125), (0.0, 1.0), (1.0, 0.0)),
         )
         self.assertEqual(
             config.evaluation_alpha_labels,
-            ("ext08_rnd02", "ext00_rnd10", "ext10_rnd00"),
+            ("ext0p875_rnd0p125", "ext0_rnd1", "ext1_rnd0"),
         )
 
-    def test_default_evaluation_alpha_labels_are_made_unique_when_deciles_collide(self):
+    def test_default_evaluation_alpha_labels_are_made_unique_when_labels_collide(self):
         config = TrainConfig(
             **_base_config_kwargs(),
-            evaluation_alphas=((0.81, 0.19), (0.84, 0.16)),
+            evaluation_alphas=((0.8, 0.2), (0.8, 0.2)),
         )
         self.assertEqual(
             config.evaluation_alpha_labels,
-            ("ext08_rnd02", "ext08_rnd02_2"),
+            ("ext0p8_rnd0p2", "ext0p8_rnd0p2_2"),
         )
 
     def test_passing_evaluation_alpha_labels_is_not_supported(self):
@@ -173,7 +173,7 @@ class TestMainAlgoEvalConfig(unittest.TestCase):
             rtol=0,
             atol=1e-6,
         )
-        self.assertEqual(config.evaluation_alpha_labels, ("ext06_rnd04",))
+        self.assertEqual(config.evaluation_alpha_labels, ("ext0p6_rnd0p4",))
 
     def test_invalid_baseline_fixed_training_alpha_raises(self):
         with self.assertRaises(ValueError):

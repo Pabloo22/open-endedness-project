@@ -108,10 +108,10 @@ class CurriculumConfig:
 class TrainConfig:
     train_seed: int = 42
     env_id: str = "Craftax-Classic-Symbolic-v1"
-    procedural_generation: bool = True
+    procedural_generation: bool = False
     fixed_reset_seed: int = 142
     achievement_ids_to_block: Sequence[int] = ()
-    remove_health_reward: bool = False
+    remove_health_reward: bool = True
     episode_max_steps: int | None = 3000
     training_mode: str = "curriculum"
 
@@ -643,9 +643,11 @@ class TrainConfig:
         for alpha in self.evaluation_alphas_array:
             alpha_tokens = []
             for reward_prefix, reward_weight in zip(reward_label_prefixes, alpha, strict=True):
-                decile_weight = int(round(float(reward_weight) * 10.0))
-                decile_weight = max(0, min(10, decile_weight))
-                alpha_tokens.append(f"{reward_prefix}{decile_weight:02d}")
+                rounded_weight = round(float(reward_weight), 6)
+                weight_text = f"{rounded_weight:.6f}".rstrip("0").rstrip(".")
+                if weight_text in ("", "-0"):
+                    weight_text = "0"
+                alpha_tokens.append(f"{reward_prefix}{weight_text.replace('.', 'p')}")
             labels.append("_".join(alpha_tokens))
 
         unique_labels: list[str] = []
