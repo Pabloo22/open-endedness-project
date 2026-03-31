@@ -243,6 +243,7 @@ def train_one_iteration(
             "curriculum/alpha/std_per_reward_function": jnp.std(
                 alpha_batch, axis=0
             ),  # [R]
+            "curriculum/alpha/per_env": alpha_batch,  # [B, R]
             "curriculum/alpha/entropy_mean": jnp.mean(alpha_entropy_per_env),  # scalar
             "curriculum/lp_per_reward_function": jnp.mean(
                 lp_per_reward_function, axis=0

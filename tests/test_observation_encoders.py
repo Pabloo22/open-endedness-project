@@ -12,6 +12,7 @@ from crew.networks.encoders import (
     CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
     CRAFTAX_SYMBOLIC_ENV_ID,
     build_observation_encoder,
+    extract_inventory_from_flat_craftax_symbolic_observation,
     split_flat_craftax_symbolic_observation,
 )
 
@@ -26,6 +27,7 @@ def _layout(env_id: str) -> dict[str, int | bool]:
             "num_actor_channels": 4,
             "map_channels": 21,
             "extra_features_dim": 22,
+            "inventory_dim": 12,
             "total_obs_dim": 1345,
             "has_items": False,
             "has_visibility": False,
@@ -38,6 +40,7 @@ def _layout(env_id: str) -> dict[str, int | bool]:
         "num_actor_channels": 40,
         "map_channels": 83,
         "extra_features_dim": 51,
+        "inventory_dim": 16,
         "total_obs_dim": 8268,
         "has_items": True,
         "has_visibility": True,
@@ -155,6 +158,42 @@ class TestCraftaxStructuredEncoder(unittest.TestCase):
                 self.assertEqual(jitted_outputs.shape, (2, 3, 32))
 
 
+class TestInventoryOnlyEncoder(unittest.TestCase):
+    def test_inventory_slice_matches_the_first_extra_features(self):
+        layout = _layout(CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
+        observations = _build_flat_obs(env_id=CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID, visible_cells=[])
+        inventory = extract_inventory_from_flat_craftax_symbolic_observation(observations, CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
+        np.testing.assert_allclose(
+            np.asarray(inventory[0]),
+            np.arange(layout["inventory_dim"], dtype=np.float32),
+        )
+
+    def test_inventory_only_encoder_preserves_leading_batch_dims_and_jits(self):
+        layout = _layout(CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
+        encoder = build_observation_encoder(
+            encoder_mode="inventory_only",
+            env_id=CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
+            obs_emb_dim=32,
+        )
+        observations = jnp.zeros((2, 3, layout["total_obs_dim"]), dtype=jnp.float32)
+        params = encoder.init(jax.random.key(5), observations)
+
+        outputs = encoder.apply(params, observations)
+        self.assertEqual(outputs.shape, (2, 3, 32))
+
+        jitted_apply = jax.jit(lambda x: encoder.apply(params, x))
+        jitted_outputs = jitted_apply(observations)
+        self.assertEqual(jitted_outputs.shape, (2, 3, 32))
+
+    def test_inventory_only_encoder_is_not_supported_for_full_craftax(self):
+        with self.assertRaises(ValueError):
+            build_observation_encoder(
+                encoder_mode="inventory_only",
+                env_id=CRAFTAX_SYMBOLIC_ENV_ID,
+                obs_emb_dim=32,
+            )
+
+
 class TestStructuredEncoderIntegration(unittest.TestCase):
     def test_actor_critic_init_and_forward_with_structured_encoder(self):
         layout = _layout(CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
@@ -228,6 +267,62 @@ class TestStructuredEncoderIntegration(unittest.TestCase):
         )
         icm_params = icm_network.init(
             jax.random.key(4),
+            observations,
+            next_observations,
+            actions,
+            method=ICMNet.init_all,
+        )
+        z_hat_next, a_hat = icm_network.apply(
+            icm_params,
+            observations,
+            next_observations,
+            actions,
+            method=ICMNet.init_all,
+        )
+        self.assertEqual(z_hat_next.shape, (2, 16))
+        self.assertEqual(a_hat.shape, (2, 17))
+
+    def test_intrinsic_networks_init_with_inventory_only_encoder(self):
+        layout = _layout(CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID)
+        observations = jnp.zeros((2, layout["total_obs_dim"]), dtype=jnp.float32)
+        next_observations = jnp.zeros((2, layout["total_obs_dim"]), dtype=jnp.float32)
+        actions = jnp.zeros((2,), dtype=jnp.int32)
+
+        rnd_network = RNDTargetAndPredictor(
+            encoder_mode="inventory_only",
+            env_id=CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
+            output_embedding_dim=16,
+            obs_emb_dim=32,
+            head_activation="relu",
+            head_hidden_dim=16,
+        )
+        rnd_params = rnd_network.init(jax.random.key(6), observations)
+        rnd_outputs = rnd_network.apply(rnd_params, observations)
+        self.assertEqual(rnd_outputs.shape, (2, 16))
+
+        ngu_network = NGUEmbeddingNetwork(
+            encoder_mode="inventory_only",
+            env_id=CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
+            output_embedding_dim=16,
+            obs_emb_dim=32,
+            head_activation="relu",
+            head_hidden_dim=16,
+        )
+        ngu_params = ngu_network.init(jax.random.key(7), observations)
+        ngu_outputs = ngu_network.apply(ngu_params, observations)
+        self.assertEqual(ngu_outputs.shape, (2, 16))
+
+        icm_network = ICMNet(
+            env_id=CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
+            encoder_mode="inventory_only",
+            obs_emb_dim=16,
+            action_dim=17,
+            forward_hidden_dims=[16],
+            inverse_hidden_dims=[16],
+            activation_fn="relu",
+        )
+        icm_params = icm_network.init(
+            jax.random.key(8),
             observations,
             next_observations,
             actions,

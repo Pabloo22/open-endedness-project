@@ -22,17 +22,13 @@ class NGUEmbeddingNetwork(nn.Module):
     obs_emb_dim: int
     head_activation: str
     head_hidden_dim: int
-    use_inventory_only: bool = False
 
     def setup(self):
-        if not self.use_inventory_only:
-            self.input_encoder = build_observation_encoder(
-                encoder_mode=self.encoder_mode,
-                env_id=self.env_id,
-                obs_emb_dim=self.obs_emb_dim,
-            )
-        else:
-            self.input_encoder = None
+        self.input_encoder = build_observation_encoder(
+            encoder_mode=self.encoder_mode,
+            env_id=self.env_id,
+            obs_emb_dim=self.obs_emb_dim,
+        )
 
         if self.head_activation == "relu":
             self.activation_fn = nn.relu
@@ -51,30 +47,9 @@ class NGUEmbeddingNetwork(nn.Module):
         )
 
     def __call__(self, observations: jax.Array) -> jax.Array:
-        if self.use_inventory_only:
-            from crew.networks.encoders import (
-                CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
-                CRAFTAX_CLASSIC_HEIGHT,
-                CRAFTAX_CLASSIC_WIDTH,
-                CRAFTAX_CLASSIC_MAP_CHANNELS,
-                CRAFTAX_HEIGHT,
-                CRAFTAX_WIDTH,
-                CRAFTAX_MAP_CHANNELS,
-            )
-
-            if self.env_id == CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID:
-                flat_map_dim = CRAFTAX_CLASSIC_HEIGHT * CRAFTAX_CLASSIC_WIDTH * CRAFTAX_CLASSIC_MAP_CHANNELS
-                inventory_dim = 12
-            else:
-                flat_map_dim = CRAFTAX_HEIGHT * CRAFTAX_WIDTH * CRAFTAX_MAP_CHANNELS
-                inventory_dim = 16
-
-            encoded_input = observations[..., flat_map_dim : flat_map_dim + inventory_dim]
-        else:
-            encoded_input = self.input_encoder(observations=observations)
-
-        outputs = self.linear1(encoded_input)
-        outputs = self.activation_fn(outputs)
+        encoded_input = self.input_encoder(observations=observations)  # [2, 256] then [16, 256]
+        outputs = self.linear1(encoded_input)  # [2, 64] then [16, 64]
+        outputs = self.activation_fn(outputs)  # [2, 64] then [16, 64]
         return self.linear_out(outputs)
 
 
@@ -167,13 +142,12 @@ class NGUIntrinsicModule:
     ) -> NGUModuleState:
         init_obs = jnp.zeros((2, *obs_shape), dtype=jnp.float32)
         network = NGUEmbeddingNetwork(
-            encoder_mode=config.encoder_mode,
+            encoder_mode=config.ngu.encoder_mode,
             env_id=config.env_id,
             output_embedding_dim=config.ngu.output_embedding_dim,
             obs_emb_dim=config.obs_emb_dim,
             head_activation=config.ngu.head_activation,
             head_hidden_dim=config.ngu.head_hidden_dim,
-            use_inventory_only=config.ngu.use_inventory_only,
         )
         params = network.init(rng, init_obs)
         tx = optax.chain(

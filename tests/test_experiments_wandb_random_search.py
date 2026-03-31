@@ -2,11 +2,12 @@ import unittest
 from unittest.mock import patch
 
 import numpy as np
+from crew.experiments.tuning_configs import _active_configs as active_tuning_configs
 
 from crew.experiments import tuning_configs
-from crew.experiments.wandb_hp_search import (
-    DEFAULT_OBJECTIVE_METRIC,
+from crew.hyp_tuning.wandb_hp_search import (
     DEFAULT_BASELINE_INTRINSIC_ALPHA,
+    DEFAULT_OBJECTIVE_METRIC,
     SWEEP_METHOD_GRID,
     SWEEP_METHOD_RANDOM,
     TUNING_PHASE_CURRICULUM,
@@ -181,20 +182,20 @@ class TestWandbRandomSearch(unittest.TestCase):
 
     def test_curriculum_preset_lookup_accepts_multiple_modules_when_preset_exists(self):
         curriculum_config = {
-            **tuning_configs.RND_CURRICULUM_BASE_CONFIG_V1,
-            "selected_intrinsic_modules": ("rnd", "icm"),
+            "training_mode": "curriculum",
+            "selected_intrinsic_modules": ("icm", "rnd"),
             "evaluation_alphas": ((0.7, 0.2, 0.1), (1.0, 0.0, 0.0)),
         }
 
         with patch.dict(
-            tuning_configs.ACTIVE_CURRICULUM_BASE_CONFIGS,
-            {("rnd", "icm"): curriculum_config},
+            active_tuning_configs.ACTIVE_CURRICULUM_BASE_CONFIGS,
+            {("icm", "rnd"): curriculum_config},
             clear=False,
         ):
             resolved_config = tuning_configs.get_curriculum_base_config_for_modules(("rnd", "icm"))
 
         self.assertEqual(resolved_config["training_mode"], "curriculum")
-        self.assertEqual(resolved_config["selected_intrinsic_modules"], ("rnd", "icm"))
+        self.assertEqual(resolved_config["selected_intrinsic_modules"], ("icm", "rnd"))
         self.assertEqual(resolved_config["evaluation_alphas"], ((0.7, 0.2, 0.1), (1.0, 0.0, 0.0)))
 
     def test_parse_fixed_overrides_supports_scalars_and_collections(self):

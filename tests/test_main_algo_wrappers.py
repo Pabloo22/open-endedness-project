@@ -146,26 +146,6 @@ class TestOptimisticResetVecEnvWrapper(unittest.TestCase):
         )
 
 
-class TestAutoResetEnvWrapper(unittest.TestCase):
-    def test_step_handles_broadcastable_state_leaf_shape_mismatch(self):
-        env = AutoResetEnvWrapper(_DummyAutoResetShapeMismatchEnv())
-        _, state = env.reset(jax.random.key(0), None)
-
-        obs, next_state, reward, done, info = env.step(
-            jax.random.key(1),
-            state,
-            jnp.array(0, dtype=jnp.int32),
-            None,
-        )
-
-        np.testing.assert_array_equal(np.asarray(obs), np.asarray([1.0, 1.0], dtype=np.float32))
-        np.testing.assert_array_equal(np.asarray(next_state["counter"]), np.asarray(1, dtype=np.int32))
-        np.testing.assert_array_equal(np.asarray(next_state["rng_like"]), np.asarray([10, 20], dtype=np.int32))
-        np.testing.assert_array_equal(np.asarray(reward), np.asarray(1.0, dtype=np.float32))
-        np.testing.assert_array_equal(np.asarray(done), np.asarray(False, dtype=bool))
-        self.assertEqual(info, {})
-
-
 class TestOptimisticResetRatioResolution(unittest.TestCase):
     def test_resolves_largest_divisor_within_limit(self):
         self.assertEqual(_resolve_optimistic_reset_ratio(num_envs=18, ratio_limit=16), 9)

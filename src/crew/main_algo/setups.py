@@ -24,7 +24,6 @@ from crew.main_algo.wrappers import (
     FixedResetKeyEnvWrapper,
     OptimisticResetVecEnvWrapper,
     SparseCraftaxWrapper,
-    FixedWorldWrapper,
 )
 
 
@@ -172,9 +171,6 @@ def set_up_for_training(
 
     # Environment setup.
     base_env = make_craftax_env_from_name(config.env_id, auto_reset=False)
-    if config.use_fixed_world:
-        base_env = FixedWorldWrapper(base_env, fixed_seed=config.fixed_world_seed)
-
     env_params = base_env.default_params
     if config.episode_max_steps is not None:
         env_params = env_params.replace(max_timesteps=config.episode_max_steps)

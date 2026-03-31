@@ -9,6 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 
 import wandb
+from crew.experiments.identity import build_experiment_identity
 
 
 def build_reward_function_names(config: Any) -> tuple[str, ...]:
@@ -20,8 +21,20 @@ def build_wandb_run_name(config: Any) -> str:
     """Build deterministic default run name when no explicit name is provided."""
     if config.wandb_run_name is not None:
         return config.wandb_run_name
-    intrinsic_modules = "+".join(config.selected_intrinsic_modules) if config.selected_intrinsic_modules else "none"
-    return f"{config.training_mode}|intr:{intrinsic_modules}|{config.env_id}|seed{config.train_seed}"
+    return build_experiment_identity(config).run_name
+
+
+def build_wandb_group(config: Any) -> str:
+    """Build deterministic default run group when no explicit group is provided."""
+    if config.wandb_group is not None:
+        return config.wandb_group
+    return build_experiment_identity(config).run_group
+
+
+def build_wandb_tags(config: Any) -> tuple[str, ...]:
+    """Build stable default tags merged with user-provided tags."""
+    identity = build_experiment_identity(config)
+    return tuple(dict.fromkeys((*identity.tags, *tuple(config.wandb_tags))))
 
 
 def init_wandb_run(config: Any) -> Any | None:
@@ -36,9 +49,9 @@ def init_wandb_run(config: Any) -> Any | None:
     return wandb.init(
         project=config.wandb_project,
         entity=config.wandb_entity,
-        group=config.wandb_group,
+        group=build_wandb_group(config),
         name=build_wandb_run_name(config),
-        tags=list(config.wandb_tags),
+        tags=list(build_wandb_tags(config)),
         config=dataclasses.asdict(config),
     )
 
@@ -66,6 +79,19 @@ def _split_reward_vector_metric(
         payload[f"{metric_key}/{reward_name}"] = float(reward_value)
 
 
+def _append_intrinsic_module_scalar_metrics(
+    payload: dict[str, int | float],
+    batch_metrics: dict[str, Any],
+) -> None:
+    """Append scalar intrinsic-module metrics present in `batch_metrics`."""
+    for key in sorted(batch_metrics):
+        if not key.startswith("intrinsic_modules/"):
+            continue
+        metric_value = jnp.asarray(batch_metrics[key])
+        if metric_value.ndim == 0:
+            payload[key] = metric_value.item()
+
+
 def _build_training_batch_log_payload_curriculum(
     batch_metrics: dict[str, Any],
     reward_function_names: tuple[str, ...],
@@ -82,10 +108,6 @@ def _build_training_batch_log_payload_curriculum(
         "ppo/actor_loss",
         "ppo/entropy",
         "ppo/approx_kl",
-        "intrinsic_modules/rnd/predictor_loss",
-        "intrinsic_modules/icm/loss",
-        "intrinsic_modules/icm/inverse_loss",
-        "intrinsic_modules/icm/forward_loss",
         "curriculum/pred_score_mean",
         "curriculum/predictor_loss",
         "curriculum/alpha/entropy_mean",
@@ -106,6 +128,7 @@ def _build_training_batch_log_payload_curriculum(
     payload: dict[str, int | float] = {}
     for scalar_key in scalar_metric_keys:
         payload[scalar_key] = jnp.asarray(batch_metrics[scalar_key]).item()
+    _append_intrinsic_module_scalar_metrics(payload=payload, batch_metrics=batch_metrics)
 
     for reward_metric_key in reward_vector_metric_keys:
         _split_reward_vector_metric(
@@ -143,9 +166,7 @@ def _build_training_batch_log_payload_baseline(
     payload: dict[str, int | float] = {}
     for scalar_key in scalar_metric_keys:
         payload[scalar_key] = jnp.asarray(batch_metrics[scalar_key]).item()
-    for key in batch_metrics:
-        if key.startswith("intrinsic_modules/"):
-            payload[key] = jnp.asarray(batch_metrics[key]).item()
+    _append_intrinsic_module_scalar_metrics(payload=payload, batch_metrics=batch_metrics)
 
     for reward_metric_key in reward_vector_metric_keys:
         _split_reward_vector_metric(

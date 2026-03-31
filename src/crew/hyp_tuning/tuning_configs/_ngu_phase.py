@@ -79,7 +79,7 @@ def get_best_ngu_config_provisional() -> dict[str, Any]:
     """
     return {
         **get_ngu_base_config_v2(),
-        "ngu.use_inventory_only": True,
+        "ngu.encoder_mode": "inventory_only",
         "ngu.gamma": 0.999,
         "ngu.kernel_cluster_distance": 1e-4,
         "baseline_fixed_training_alpha": (0.7, 0.3),

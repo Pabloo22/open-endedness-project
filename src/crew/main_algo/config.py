@@ -8,37 +8,44 @@ from typing import ClassVar
 
 import jax.numpy as jnp
 
+from crew.experiments.identity import ORDERED_ACHIEVEMENTS_BY_ENV
 from crew.networks.encoders import (
     SUPPORTED_ENCODER_MODES as SUPPORTED_OBSERVATION_ENCODER_MODES,
+)
+from crew.networks.encoders import (
+    SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS,
     SUPPORTED_STRUCTURED_ENCODER_ENV_IDS,
 )
 
 
 @dataclass
 class RNDConfig:
-    output_embedding_dim: int = 256
+    encoder_mode: str = "inventory_only"
+    output_embedding_dim: int = 128
     head_activation: str = "relu"
-    head_hidden_dim: int = 256
-    use_inventory_only: bool = False
+    head_hidden_dim: int = 128
 
     predictor_network_lr: float = 1e-4
     predictor_update_epochs: int = 1
     predictor_num_minibatches: int = 64
     num_chunks_in_rewards_computation: int = 64
-    gamma: float = 0.99
+    gamma: float = 0.995
     gae_lambda: float = 0.95
 
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = SUPPORTED_OBSERVATION_ENCODER_MODES
+
 
 @dataclass
 class ICMConfig:
     # NN configuration
+    encoder_mode: str = "craftax_structured"
     activation_fn: str = "relu"
     forward_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
     inverse_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
-    
+
     obs_emb_dim: int = 256
-    
+
     # hyperparams
     lr: float = 1e-4
     reward_eta: float = 0.01
@@ -47,17 +54,20 @@ class ICMConfig:
     num_minibatches: int = 64
     num_chunks_in_rewards_computation: int = 64
     eps: float = 1e-8
-    
+
     gamma: float = 0.99
     gae_lambda: float = 0.95
-    
+
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = SUPPORTED_OBSERVATION_ENCODER_MODES
+
+
 @dataclass
 class NGUConfig:
+    encoder_mode: str = "inventory_only"
     output_embedding_dim: int = 64
     head_activation: str = "relu"
     head_hidden_dim: int = 64
-    use_inventory_only: bool = False
 
     episodic_memory_capacity: int = 4096  # was 1000
     num_neighbors: int = 10
@@ -72,18 +82,21 @@ class NGUConfig:
     gae_lambda: float = 0.95
 
     SUPPORTED_HEAD_ACTIVATIONS: ClassVar[tuple[str, ...]] = ("relu", "tanh")
+    SUPPORTED_ENCODER_MODES: ClassVar[tuple[str, ...]] = SUPPORTED_OBSERVATION_ENCODER_MODES
+
+
 @dataclass
 class CurriculumConfig:
-    score_lp_mode: str = "alp"
+    score_lp_mode: str = "lp"
     score_lambda: float = 0.5
-    replay_buffer_num_batches: int = 5
+    replay_buffer_num_batches: int = 3
     predictor_lr: float = 1e-4
     predictor_update_epochs: int = 1
     predictor_num_minibatches: int = 16
     predictor_hidden_dim: int = 128
     predictor_activation: str = "relu"
     importance_num_candidates_multiplier: int = 10
-    min_batches_for_predictor_sampling: int = 1
+    min_batches_for_predictor_sampling: int = 3
     sampling_weights_eps: float = 1e-8
     lp_norm_ema_beta: float = 0.05
 
@@ -95,10 +108,10 @@ class CurriculumConfig:
 class TrainConfig:
     train_seed: int = 42
     env_id: str = "Craftax-Classic-Symbolic-v1"
-    procedural_generation: bool = True
-    fixed_reset_seed: int = 12345
+    procedural_generation: bool = False
+    fixed_reset_seed: int = 142
     achievement_ids_to_block: Sequence[int] = ()
-    remove_health_reward: bool = False
+    remove_health_reward: bool = True
     episode_max_steps: int | None = 3000
     training_mode: str = "curriculum"
 
@@ -131,13 +144,13 @@ class TrainConfig:
     reward_norm_clip: float | None = None
     reset_normalization_running_forward_return_on_new_alpha: bool = False
 
-    # encoder
-    encoder_mode: str = "flat_symbolic"
+    # actor-critic observation encoder
+    encoder_mode: str = "craftax_structured"
     obs_emb_dim: int = 256
 
     # Transformer XL specific
-    past_context_length: int = 128
-    subsequence_length_in_loss_calculation: int = 64
+    past_context_length: int = 64
+    subsequence_length_in_loss_calculation: int = 32
     num_attn_heads: int = 4
     num_transformer_blocks: int = 2
     transformer_hidden_states_dim: int = 192
@@ -156,9 +169,6 @@ class TrainConfig:
     use_weighted_value_loss: bool = True
 
     # module selection and module-specific nested config
-    use_fixed_world: bool = False
-    fixed_world_seed: int = 42
-
     selected_intrinsic_modules: tuple[str, ...] = ("rnd",)
     baseline_fixed_training_alpha: tuple[float, ...] | None = None
     num_reward_functions: int = field(init=False)
@@ -172,8 +182,8 @@ class TrainConfig:
 
     # eval
     eval_every_n_batches: int = 2
-    eval_num_envs: int = 1024
-    eval_num_episodes: int = 2
+    eval_num_envs: int = 64
+    eval_num_episodes: int = 4
     evaluation_alphas: tuple[tuple[float, ...], ...] | None = None
     evaluation_alpha_labels: tuple[str, ...] = field(init=False)
     evaluation_alphas_array: jnp.ndarray = field(init=False)
@@ -207,21 +217,14 @@ class TrainConfig:
         if self.env_id not in self.SUPPORTED_ENV_IDS:
             msg = f"env_id must be one of {self.SUPPORTED_ENV_IDS}. Received env_id={self.env_id!r}."
             raise ValueError(msg)
+        self._validate_achievement_ids_to_block()
 
         if self.head_activation not in self.SUPPORTED_HEAD_ACTIVATIONS:
             msg = (
                 f"head_activation must be one of {self.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.head_activation!r}."
             )
             raise ValueError(msg)
-        if self.encoder_mode not in self.SUPPORTED_ENCODER_MODES:
-            msg = f"encoder_mode must be one of {self.SUPPORTED_ENCODER_MODES}. Received {self.encoder_mode!r}."
-            raise ValueError(msg)
-        if self.encoder_mode == "craftax_structured" and self.env_id not in SUPPORTED_STRUCTURED_ENCODER_ENV_IDS:
-            msg = (
-                "encoder_mode='craftax_structured' is only supported for "
-                f"{SUPPORTED_STRUCTURED_ENCODER_ENV_IDS}. Received env_id={self.env_id!r}."
-            )
-            raise ValueError(msg)
+        self._validate_encoder_mode(self.encoder_mode, "encoder_mode")
 
         self._validate_selected_intrinsic_modules()
         self._validate_training_layout()
@@ -242,8 +245,35 @@ class TrainConfig:
         self.evaluation_alphas_array = self._build_evaluation_alphas_array()
         self.evaluation_alpha_labels = self._build_evaluation_alpha_labels()
 
+    def _validate_canonical_intrinsic_module_order(self):
+        ordered_modules = tuple(self.selected_intrinsic_modules)
+        canonical_modules = tuple(sorted(ordered_modules))
+        if ordered_modules != canonical_modules:
+            msg = (
+                "selected_intrinsic_modules must use canonical alphabetical order. "
+                f"Expected {canonical_modules!r}, received {ordered_modules!r}."
+            )
+            raise ValueError(msg)
+
+    def _validate_achievement_ids_to_block(self):
+        valid_ids = {int(achievement.value) for achievement in ORDERED_ACHIEVEMENTS_BY_ENV[self.env_id]}
+        blocked_ids = {int(achievement_id) for achievement_id in self.achievement_ids_to_block}
+
+        unknown_blocked_ids = blocked_ids - valid_ids
+        if unknown_blocked_ids:
+            msg = (
+                "achievement_ids_to_block contains ids that are not valid for the configured environment. "
+                f"Unknown ids: {tuple(sorted(unknown_blocked_ids))}."
+            )
+            raise ValueError(msg)
+
+        if len(blocked_ids) == len(valid_ids):
+            raise ValueError("At least one extrinsic achievement must remain unblocked.")
+
     def _validate_selected_intrinsic_modules(self):
-        from crew.main_algo.intrinsic_modules.registry import get_registered_intrinsic_module_names
+        from crew.main_algo.intrinsic_modules.registry import (
+            get_registered_intrinsic_module_names,
+        )
 
         registered_names = get_registered_intrinsic_module_names()
         if self.training_mode == "curriculum" and not self.selected_intrinsic_modules:
@@ -262,6 +292,7 @@ class TrainConfig:
             if module_name not in registered_names:
                 msg = f"Unsupported intrinsic module name {module_name!r}. Supported names: {registered_names}."
                 raise ValueError(msg)
+        self._validate_canonical_intrinsic_module_order()
 
     def _validate_training_layout(self):
         if (
@@ -299,6 +330,7 @@ class TrainConfig:
     def _validate_selected_module_configs(self):
         # RND-specific static checks; rollout-dependent checks are deferred until phase 2.
         if "rnd" in self.selected_intrinsic_modules:
+            self._validate_encoder_mode(self.rnd.encoder_mode, "rnd.encoder_mode")
             if self.rnd.head_activation not in RNDConfig.SUPPORTED_HEAD_ACTIVATIONS:
                 msg = f"rnd.head_activation must be one of {RNDConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.rnd.head_activation!r}."
                 raise ValueError(msg)
@@ -320,6 +352,7 @@ class TrainConfig:
                 raise ValueError(msg)
 
         if "icm" in self.selected_intrinsic_modules:
+            self._validate_encoder_mode(self.icm.encoder_mode, "icm.encoder_mode")
             if self.icm.beta < 0.0 or self.icm.beta > 1.0:
                 msg = f"icm.beta must be in [0, 1]. Received {self.icm.beta}."
                 raise ValueError(msg)
@@ -347,6 +380,7 @@ class TrainConfig:
                 raise ValueError(msg)
 
         if "ngu" in self.selected_intrinsic_modules:
+            self._validate_encoder_mode(self.ngu.encoder_mode, "ngu.encoder_mode")
             if self.ngu.head_activation not in NGUConfig.SUPPORTED_HEAD_ACTIVATIONS:
                 msg = f"ngu.head_activation must be one of {NGUConfig.SUPPORTED_HEAD_ACTIVATIONS}. Received {self.ngu.head_activation!r}."
                 raise ValueError(msg)
@@ -377,6 +411,23 @@ class TrainConfig:
                     "otherwise observations will be silently overwritten mid-episode."
                 )
                 raise ValueError(msg)
+
+    def _validate_encoder_mode(self, encoder_mode: str, field_name: str) -> None:
+        if encoder_mode not in self.SUPPORTED_ENCODER_MODES:
+            msg = f"{field_name} must be one of {self.SUPPORTED_ENCODER_MODES}. Received {encoder_mode!r}."
+            raise ValueError(msg)
+        if encoder_mode == "craftax_structured" and self.env_id not in SUPPORTED_STRUCTURED_ENCODER_ENV_IDS:
+            msg = (
+                f"{field_name}={encoder_mode!r} is only supported for "
+                f"{SUPPORTED_STRUCTURED_ENCODER_ENV_IDS}. Received env_id={self.env_id!r}."
+            )
+            raise ValueError(msg)
+        if encoder_mode == "inventory_only" and self.env_id not in SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS:
+            msg = (
+                f"{field_name}={encoder_mode!r} is only supported for "
+                f"{SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS}. Received env_id={self.env_id!r}."
+            )
+            raise ValueError(msg)
 
     def _apply_mode_specific_overrides(self):
         if self.training_mode == "baseline":
@@ -592,9 +643,11 @@ class TrainConfig:
         for alpha in self.evaluation_alphas_array:
             alpha_tokens = []
             for reward_prefix, reward_weight in zip(reward_label_prefixes, alpha, strict=True):
-                decile_weight = int(round(float(reward_weight) * 10.0))
-                decile_weight = max(0, min(10, decile_weight))
-                alpha_tokens.append(f"{reward_prefix}{decile_weight:02d}")
+                rounded_weight = round(float(reward_weight), 6)
+                weight_text = f"{rounded_weight:.6f}".rstrip("0").rstrip(".")
+                if weight_text in ("", "-0"):
+                    weight_text = "0"
+                alpha_tokens.append(f"{reward_prefix}{weight_text.replace('.', 'p')}")
             labels.append("_".join(alpha_tokens))
 
         unique_labels: list[str] = []
