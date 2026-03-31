@@ -2,13 +2,15 @@
 
 from __future__ import annotations
 
+import random
+
 from craftax.craftax_classic.constants import Achievement
 
 from crew.experiments.paper_run_utils import (
     build_achievement_ids_to_block,
     build_two_intrinsic_evaluation_alphas,
-    sample_intrinsic_modules,
 )
+from crew.experiments.identity import ORDERED_ACHIEVEMENTS_BY_ENV
 from crew.experiments.run_training import run_main_algo_training
 from crew.main_algo.config import TrainConfig
 
@@ -34,13 +36,24 @@ SAVE_RESULTS = True
 
 def main() -> None:
     achievement_ids_to_block = build_achievement_ids_to_block(ENV_ID, EXTRINSIC_ACHIEVEMENTS)
-    selected_intrinsic_modules = sample_intrinsic_modules(
-        INTRINSIC_MODULE_CANDIDATES,
-        INTRINSIC_MODULE_SELECTION_SEED,
-    )
-    evaluation_alphas = build_two_intrinsic_evaluation_alphas(EVALUATION_GRID_SIZE)
+    if len(INTRINSIC_MODULE_CANDIDATES) < 2:
+        raise ValueError("INTRINSIC_MODULE_CANDIDATES must contain at least two modules.")
 
-    print(f"extrinsic_achievements={tuple(achievement.name.lower() for achievement in EXTRINSIC_ACHIEVEMENTS)}")
+    if len(INTRINSIC_MODULE_CANDIDATES) > 2:
+        selected_intrinsic_modules = tuple(
+            sorted(random.Random(INTRINSIC_MODULE_SELECTION_SEED).sample(list(INTRINSIC_MODULE_CANDIDATES), k=2))
+        )
+    else:
+        selected_intrinsic_modules = tuple(sorted(INTRINSIC_MODULE_CANDIDATES))
+
+    evaluation_alphas = build_two_intrinsic_evaluation_alphas(EVALUATION_GRID_SIZE)
+    total_achievements = len(ORDERED_ACHIEVEMENTS_BY_ENV[ENV_ID])
+    num_extrinsic_achievements = total_achievements - len(achievement_ids_to_block)
+
+    print(
+        f"extrinsic_achievements={tuple(achievement.name.lower() for achievement in EXTRINSIC_ACHIEVEMENTS)} "
+        f"({num_extrinsic_achievements}/{total_achievements})"
+    )
     print(f"selected_intrinsic_modules={selected_intrinsic_modules}")
     print(f"num_evaluation_alphas={len(evaluation_alphas)}")
     print(f"train_seeds={tuple(TRAIN_SEEDS)}")

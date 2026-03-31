@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import random
 from collections.abc import Sequence
 
 from crew.experiments.identity import ORDERED_ACHIEVEMENTS_BY_ENV
@@ -15,10 +14,6 @@ def build_achievement_ids_to_block(env_id: str, extrinsic_achievements: Sequence
         for achievement in ORDERED_ACHIEVEMENTS_BY_ENV[env_id]
         if int(achievement.value) not in extrinsic_ids
     )
-
-
-def sample_intrinsic_modules(module_candidates: Sequence[str], selection_seed: int) -> tuple[str, str]:
-    return tuple(sorted(random.Random(selection_seed).sample(sorted(module_candidates), k=2)))
 
 
 def build_two_intrinsic_evaluation_alphas(grid_size: int) -> tuple[tuple[float, float, float], ...]:
