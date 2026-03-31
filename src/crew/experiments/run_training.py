@@ -109,7 +109,7 @@ def build_run_config(*, smoke_run: bool) -> TrainConfig:
     return build_training_run_config()
 
 
-def run_training(config: TrainConfig, save_results: bool = True) -> dict[str, Any]:
+def run_main_algo_training(config: TrainConfig, save_results: bool = True) -> dict[str, Any]:
     """Run one full training experiment and optionally save results."""
     (
         rng,
@@ -202,7 +202,7 @@ def main(argv: Sequence[str] | None = None) -> None:
     """Run training from the CLI using the selected preset."""
     args = parse_args(argv)
     config = build_run_config(smoke_run=args.smoke_run)
-    run_training(config=config, save_results=args.save_results)
+    run_main_algo_training(config=config, save_results=args.save_results)
 
 
 if __name__ == "__main__":
