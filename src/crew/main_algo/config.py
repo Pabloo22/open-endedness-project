@@ -19,10 +19,10 @@ from crew.networks.encoders import (
 
 @dataclass
 class RNDConfig:
-    encoder_mode: str = "flat_symbolic"
-    output_embedding_dim: int = 256
+    encoder_mode: str = "inventory_only"
+    output_embedding_dim: int = 128
     head_activation: str = "relu"
-    head_hidden_dim: int = 256
+    head_hidden_dim: int = 128
 
     predictor_network_lr: float = 1e-4
     predictor_update_epochs: int = 1
@@ -38,7 +38,7 @@ class RNDConfig:
 @dataclass
 class ICMConfig:
     # NN configuration
-    encoder_mode: str = "flat_symbolic"
+    encoder_mode: str = "craftax_structured"
     activation_fn: str = "relu"
     forward_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
     inverse_hidden_dims: list[int] = field(default_factory=lambda: [256, 256])
@@ -63,7 +63,7 @@ class ICMConfig:
 
 @dataclass
 class NGUConfig:
-    encoder_mode: str = "flat_symbolic"
+    encoder_mode: str = "inventory_only"
     output_embedding_dim: int = 64
     head_activation: str = "relu"
     head_hidden_dim: int = 64
@@ -86,16 +86,16 @@ class NGUConfig:
 
 @dataclass
 class CurriculumConfig:
-    score_lp_mode: str = "alp"
+    score_lp_mode: str = "lp"
     score_lambda: float = 0.5
-    replay_buffer_num_batches: int = 5
+    replay_buffer_num_batches: int = 3
     predictor_lr: float = 1e-4
     predictor_update_epochs: int = 1
     predictor_num_minibatches: int = 16
     predictor_hidden_dim: int = 128
     predictor_activation: str = "relu"
     importance_num_candidates_multiplier: int = 10
-    min_batches_for_predictor_sampling: int = 1
+    min_batches_for_predictor_sampling: int = 3
     sampling_weights_eps: float = 1e-8
     lp_norm_ema_beta: float = 0.05
 
@@ -144,12 +144,12 @@ class TrainConfig:
     reset_normalization_running_forward_return_on_new_alpha: bool = False
 
     # actor-critic observation encoder
-    encoder_mode: str = "flat_symbolic"
+    encoder_mode: str = "craftax_structured"
     obs_emb_dim: int = 256
 
     # Transformer XL specific
-    past_context_length: int = 128
-    subsequence_length_in_loss_calculation: int = 64
+    past_context_length: int = 64
+    subsequence_length_in_loss_calculation: int = 32
     num_attn_heads: int = 4
     num_transformer_blocks: int = 2
     transformer_hidden_states_dim: int = 192
@@ -181,8 +181,8 @@ class TrainConfig:
 
     # eval
     eval_every_n_batches: int = 2
-    eval_num_envs: int = 1024
-    eval_num_episodes: int = 2
+    eval_num_envs: int = 64
+    eval_num_episodes: int = 4
     evaluation_alphas: tuple[tuple[float, ...], ...] | None = None
     evaluation_alpha_labels: tuple[str, ...] = field(init=False)
     evaluation_alphas_array: jnp.ndarray = field(init=False)

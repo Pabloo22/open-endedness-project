@@ -25,6 +25,7 @@ class TestMainAlgoMetricsContract(unittest.TestCase):
             "curriculum/predictor_loss",
             "curriculum/alpha/mean_per_reward_function",
             "curriculum/alpha/std_per_reward_function",
+            "curriculum/alpha/per_env",
             "curriculum/alpha/entropy_mean",
             "curriculum/lp_per_reward_function",
             "curriculum/score_mean",
@@ -110,6 +111,14 @@ class TestMainAlgoMetricsContract(unittest.TestCase):
         metrics = out["metrics"]
         self.assertEqual(set(metrics.keys()), expected_final_keys)
         self.assertEqual(len(metrics), len(expected_final_keys))
+        self.assertEqual(
+            metrics["curriculum/alpha/per_env"].shape,
+            (
+                config.num_batches_of_envs,
+                config.num_envs_per_batch,
+                config.num_reward_functions,
+            ),
+        )
 
 
 if __name__ == "__main__":

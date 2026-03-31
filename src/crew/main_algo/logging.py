@@ -66,6 +66,19 @@ def _split_reward_vector_metric(
         payload[f"{metric_key}/{reward_name}"] = float(reward_value)
 
 
+def _append_intrinsic_module_scalar_metrics(
+    payload: dict[str, int | float],
+    batch_metrics: dict[str, Any],
+) -> None:
+    """Append scalar intrinsic-module metrics present in `batch_metrics`."""
+    for key in sorted(batch_metrics):
+        if not key.startswith("intrinsic_modules/"):
+            continue
+        metric_value = jnp.asarray(batch_metrics[key])
+        if metric_value.ndim == 0:
+            payload[key] = metric_value.item()
+
+
 def _build_training_batch_log_payload_curriculum(
     batch_metrics: dict[str, Any],
     reward_function_names: tuple[str, ...],
@@ -82,10 +95,6 @@ def _build_training_batch_log_payload_curriculum(
         "ppo/actor_loss",
         "ppo/entropy",
         "ppo/approx_kl",
-        "intrinsic_modules/rnd/predictor_loss",
-        "intrinsic_modules/icm/loss",
-        "intrinsic_modules/icm/inverse_loss",
-        "intrinsic_modules/icm/forward_loss",
         "curriculum/pred_score_mean",
         "curriculum/predictor_loss",
         "curriculum/alpha/entropy_mean",
@@ -106,6 +115,7 @@ def _build_training_batch_log_payload_curriculum(
     payload: dict[str, int | float] = {}
     for scalar_key in scalar_metric_keys:
         payload[scalar_key] = jnp.asarray(batch_metrics[scalar_key]).item()
+    _append_intrinsic_module_scalar_metrics(payload=payload, batch_metrics=batch_metrics)
 
     for reward_metric_key in reward_vector_metric_keys:
         _split_reward_vector_metric(
@@ -143,9 +153,7 @@ def _build_training_batch_log_payload_baseline(
     payload: dict[str, int | float] = {}
     for scalar_key in scalar_metric_keys:
         payload[scalar_key] = jnp.asarray(batch_metrics[scalar_key]).item()
-    for key in batch_metrics:
-        if key.startswith("intrinsic_modules/"):
-            payload[key] = jnp.asarray(batch_metrics[key]).item()
+    _append_intrinsic_module_scalar_metrics(payload=payload, batch_metrics=batch_metrics)
 
     for reward_metric_key in reward_vector_metric_keys:
         _split_reward_vector_metric(

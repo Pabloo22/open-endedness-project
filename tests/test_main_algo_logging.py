@@ -82,6 +82,57 @@ class TestMainAlgoLogging(unittest.TestCase):
         self.assertAlmostEqual(payload["preproc/adv_raw_mean/rnd"], 0.2, places=6)
         self.assertEqual(payload["run/total_env_steps"], 120)
 
+    def test_build_training_batch_log_payload_curriculum_accepts_any_intrinsic_module_scalars(self):
+        common_metrics = {
+            "run/batch_idx": jnp.array(3, dtype=jnp.int32),
+            "run/total_env_steps": jnp.array(120, dtype=jnp.int32),
+            "time/cumulative_wall_clock_sec": jnp.array(2.5, dtype=jnp.float32),
+            "time/env_steps_per_sec": jnp.array(48.0, dtype=jnp.float32),
+            "preproc/weighted_adv_mean": jnp.array(0.1, dtype=jnp.float32),
+            "preproc/weighted_adv_std": jnp.array(1.2, dtype=jnp.float32),
+            "ppo/total_loss": jnp.array(0.9, dtype=jnp.float32),
+            "ppo/actor_loss": jnp.array(0.3, dtype=jnp.float32),
+            "ppo/entropy": jnp.array(0.02, dtype=jnp.float32),
+            "ppo/approx_kl": jnp.array(0.01, dtype=jnp.float32),
+            "curriculum/pred_score_mean": jnp.array(0.8, dtype=jnp.float32),
+            "curriculum/predictor_loss": jnp.array(0.7, dtype=jnp.float32),
+            "curriculum/alpha/entropy_mean": jnp.array(0.6, dtype=jnp.float32),
+            "curriculum/score_mean": jnp.array(0.5, dtype=jnp.float32),
+            "curriculum/valid_fraction_of_scores_in_batch": jnp.array(1.0, dtype=jnp.float32),
+            "curriculum/completed_episodes_per_env_mean": jnp.array(2.0, dtype=jnp.float32),
+            "preproc/adv_raw_mean": jnp.array([0.1, 0.2], dtype=jnp.float32),
+            "preproc/adv_norm_mean": jnp.array([0.0, 0.0], dtype=jnp.float32),
+            "preproc/adv_norm_std": jnp.array([1.0, 1.0], dtype=jnp.float32),
+            "ppo/value_loss": jnp.array([0.4, 0.6], dtype=jnp.float32),
+            "curriculum/alpha/mean_per_reward_function": jnp.array([0.9, 0.1], dtype=jnp.float32),
+            "curriculum/alpha/std_per_reward_function": jnp.array([0.2, 0.2], dtype=jnp.float32),
+            "curriculum/lp_per_reward_function": jnp.array([0.3, 0.4], dtype=jnp.float32),
+            "curriculum/alpha/per_env": jnp.array([[0.9, 0.1], [0.8, 0.2]], dtype=jnp.float32),
+        }
+        intrinsic_metric_cases = (
+            (("extrinsic", "rnd"), {"intrinsic_modules/rnd/predictor_loss": jnp.array(0.4, dtype=jnp.float32)}),
+            (("extrinsic", "ngu"), {"intrinsic_modules/ngu/embedding_loss": jnp.array(0.5, dtype=jnp.float32)}),
+            (
+                ("extrinsic", "icm"),
+                {
+                    "intrinsic_modules/icm/loss": jnp.array(0.6, dtype=jnp.float32),
+                    "intrinsic_modules/icm/forward_loss": jnp.array(0.7, dtype=jnp.float32),
+                    "intrinsic_modules/icm/inverse_loss": jnp.array(0.8, dtype=jnp.float32),
+                },
+            ),
+        )
+
+        for reward_names, intrinsic_metrics in intrinsic_metric_cases:
+            with self.subTest(reward_names=reward_names):
+                payload = build_training_batch_log_payload(
+                    batch_metrics=common_metrics | intrinsic_metrics,
+                    reward_function_names=reward_names,
+                )
+                for metric_key, metric_value in intrinsic_metrics.items():
+                    self.assertIn(metric_key, payload)
+                    self.assertAlmostEqual(payload[metric_key], float(metric_value), places=6)
+                self.assertNotIn("curriculum/alpha/per_env", payload)
+
     def test_build_eval_log_payload(self):
         eval_metrics = {
             "eval/returns": jnp.array([[[1.0, 3.0], [2.0, 4.0]]], dtype=jnp.float32),  # [A=1,B=2,E=2]
@@ -147,6 +198,7 @@ class TestMainAlgoLogging(unittest.TestCase):
             "curriculum/alpha/mean_per_reward_function": jnp.array([0.7, 0.3], dtype=jnp.float32),
             "curriculum/alpha/std_per_reward_function": jnp.array([0.1, 0.1], dtype=jnp.float32),
             "curriculum/lp_per_reward_function": jnp.array([0.3, 0.6], dtype=jnp.float32),
+            "curriculum/alpha/per_env": jnp.array([[0.7, 0.3], [0.6, 0.4]], dtype=jnp.float32),
             "curriculum/alpha/extrinsic_weight_per_env": jnp.array([0.4, 0.5, 0.6], dtype=jnp.float32),
         }
         eval_metrics = {
