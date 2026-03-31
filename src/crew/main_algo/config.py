@@ -93,9 +93,9 @@ class CurriculumConfig:
     predictor_lr: float = 1e-4
     predictor_update_epochs: int = 1
     predictor_num_minibatches: int = 16
-    predictor_hidden_dim: int = 128
+    predictor_hidden_dim: int = 64
     predictor_activation: str = "relu"
-    importance_num_candidates_multiplier: int = 10
+    importance_num_candidates_multiplier: int = 15
     min_batches_for_predictor_sampling: int = 3
     sampling_weights_eps: float = 1e-8
     lp_norm_ema_beta: float = 0.05
@@ -112,14 +112,14 @@ class TrainConfig:
     fixed_reset_seed: int = 142
     achievement_ids_to_block: Sequence[int] = ()
     remove_health_reward: bool = True
-    episode_max_steps: int | None = 3000
+    episode_max_steps: int | None = 2000
     training_mode: str = "curriculum"
 
     # training
     num_envs_per_batch: int = 1024
     num_steps_per_env: int = 4096
     num_steps_per_update: int = 256
-    total_timesteps: int = 1_000_000_000
+    total_timesteps: int = 500_000_000
     num_batches_of_envs: int = field(init=False)
     num_updates_per_batch: int = field(init=False)
     artifacts_root: str = str(Path(__file__).resolve().parents[3] / "artifacts")
@@ -152,7 +152,7 @@ class TrainConfig:
     past_context_length: int = 64
     subsequence_length_in_loss_calculation: int = 32
     num_attn_heads: int = 4
-    num_transformer_blocks: int = 2
+    num_transformer_blocks: int = 1
     transformer_hidden_states_dim: int = 192
     qkv_features: int = 192
     gating: bool = True
