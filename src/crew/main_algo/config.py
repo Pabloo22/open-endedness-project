@@ -18,33 +18,6 @@ from crew.networks.encoders import (
 )
 
 
-def _validate_canonical_intrinsic_module_order(module_names: Sequence[str]) -> None:
-    ordered_modules = tuple(module_names)
-    canonical_modules = tuple(sorted(ordered_modules))
-    if ordered_modules != canonical_modules:
-        msg = (
-            "selected_intrinsic_modules must use canonical alphabetical order. "
-            f"Expected {canonical_modules!r}, received {ordered_modules!r}."
-        )
-        raise ValueError(msg)
-
-
-def _validate_achievement_ids_to_block(env_id: str, achievement_ids_to_block: Sequence[int]) -> None:
-    valid_ids = {int(achievement.value) for achievement in ORDERED_ACHIEVEMENTS_BY_ENV[env_id]}
-    blocked_ids = {int(achievement_id) for achievement_id in achievement_ids_to_block}
-
-    unknown_blocked_ids = blocked_ids - valid_ids
-    if unknown_blocked_ids:
-        msg = (
-            "achievement_ids_to_block contains ids that are not valid for the configured environment. "
-            f"Unknown ids: {tuple(sorted(unknown_blocked_ids))}."
-        )
-        raise ValueError(msg)
-
-    if len(blocked_ids) == len(valid_ids):
-        raise ValueError("At least one extrinsic achievement must remain unblocked.")
-
-
 @dataclass
 class RNDConfig:
     encoder_mode: str = "inventory_only"
@@ -244,7 +217,7 @@ class TrainConfig:
         if self.env_id not in self.SUPPORTED_ENV_IDS:
             msg = f"env_id must be one of {self.SUPPORTED_ENV_IDS}. Received env_id={self.env_id!r}."
             raise ValueError(msg)
-        _validate_achievement_ids_to_block(self.env_id, self.achievement_ids_to_block)
+        self._validate_achievement_ids_to_block()
 
         if self.head_activation not in self.SUPPORTED_HEAD_ACTIVATIONS:
             msg = (
@@ -272,6 +245,31 @@ class TrainConfig:
         self.evaluation_alphas_array = self._build_evaluation_alphas_array()
         self.evaluation_alpha_labels = self._build_evaluation_alpha_labels()
 
+    def _validate_canonical_intrinsic_module_order(self):
+        ordered_modules = tuple(self.selected_intrinsic_modules)
+        canonical_modules = tuple(sorted(ordered_modules))
+        if ordered_modules != canonical_modules:
+            msg = (
+                "selected_intrinsic_modules must use canonical alphabetical order. "
+                f"Expected {canonical_modules!r}, received {ordered_modules!r}."
+            )
+            raise ValueError(msg)
+
+    def _validate_achievement_ids_to_block(self):
+        valid_ids = {int(achievement.value) for achievement in ORDERED_ACHIEVEMENTS_BY_ENV[self.env_id]}
+        blocked_ids = {int(achievement_id) for achievement_id in self.achievement_ids_to_block}
+
+        unknown_blocked_ids = blocked_ids - valid_ids
+        if unknown_blocked_ids:
+            msg = (
+                "achievement_ids_to_block contains ids that are not valid for the configured environment. "
+                f"Unknown ids: {tuple(sorted(unknown_blocked_ids))}."
+            )
+            raise ValueError(msg)
+
+        if len(blocked_ids) == len(valid_ids):
+            raise ValueError("At least one extrinsic achievement must remain unblocked.")
+
     def _validate_selected_intrinsic_modules(self):
         from crew.main_algo.intrinsic_modules.registry import (
             get_registered_intrinsic_module_names,
@@ -294,7 +292,7 @@ class TrainConfig:
             if module_name not in registered_names:
                 msg = f"Unsupported intrinsic module name {module_name!r}. Supported names: {registered_names}."
                 raise ValueError(msg)
-        _validate_canonical_intrinsic_module_order(self.selected_intrinsic_modules)
+        self._validate_canonical_intrinsic_module_order()
 
     def _validate_training_layout(self):
         if (
