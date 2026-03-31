@@ -9,13 +9,8 @@ from typing import ClassVar
 import jax.numpy as jnp
 
 from crew.experiments.identity import ORDERED_ACHIEVEMENTS_BY_ENV
-from crew.networks.encoders import (
-    SUPPORTED_ENCODER_MODES as SUPPORTED_OBSERVATION_ENCODER_MODES,
-)
-from crew.networks.encoders import (
-    SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS,
-    SUPPORTED_STRUCTURED_ENCODER_ENV_IDS,
-)
+from crew.networks.encoders import SUPPORTED_ENCODER_MODES as SUPPORTED_OBSERVATION_ENCODER_MODES
+from crew.networks.encoders import SUPPORTED_INVENTORY_ONLY_ENCODER_ENV_IDS, SUPPORTED_STRUCTURED_ENCODER_ENV_IDS
 
 
 @dataclass
@@ -69,7 +64,7 @@ class NGUConfig:
     head_activation: str = "relu"
     head_hidden_dim: int = 64
 
-    episodic_memory_capacity: int = 4096  # was 1000
+    episodic_memory_capacity: int = 512  # was 1000
     num_neighbors: int = 10
     kernel_epsilon: float = 1e-3
     kernel_cluster_distance: float = 1e-3
@@ -271,9 +266,7 @@ class TrainConfig:
             raise ValueError("At least one extrinsic achievement must remain unblocked.")
 
     def _validate_selected_intrinsic_modules(self):
-        from crew.main_algo.intrinsic_modules.registry import (
-            get_registered_intrinsic_module_names,
-        )
+        from crew.main_algo.intrinsic_modules.registry import get_registered_intrinsic_module_names
 
         registered_names = get_registered_intrinsic_module_names()
         if self.training_mode == "curriculum" and not self.selected_intrinsic_modules:
@@ -405,12 +398,14 @@ class TrainConfig:
                 )
                 raise ValueError(msg)
             if self.episode_max_steps is not None and self.ngu.episodic_memory_capacity < self.episode_max_steps:
-                msg = (
+                import warnings
+
+                warnings.warn(
                     f"ngu.episodic_memory_capacity ({self.ngu.episodic_memory_capacity}) "
-                    f"must be >= episode_max_steps ({self.episode_max_steps}), "
-                    "otherwise observations will be silently overwritten mid-episode."
+                    f"< episode_max_steps ({self.episode_max_steps}): "
+                    "older embeddings will be overwritten mid-episode in the circular buffer.",
+                    stacklevel=2,
                 )
-                raise ValueError(msg)
 
     def _validate_encoder_mode(self, encoder_mode: str, field_name: str) -> None:
         if encoder_mode not in self.SUPPORTED_ENCODER_MODES:
