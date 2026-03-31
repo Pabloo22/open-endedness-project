@@ -25,7 +25,7 @@ EXTRINSIC_ACHIEVEMENTS = (
 )
 
 # Choose from the registered intrinsic module names. Two are sampled once and reused for every seed.
-INTRINSIC_MODULE_CANDIDATES = ("rnd", "icm", "ngu")
+INTRINSIC_MODULE_CANDIDATES = ("rnd", "icm")
 INTRINSIC_MODULE_SELECTION_SEED = 0
 
 EVALUATION_GRID_SIZE = 8
