@@ -11,7 +11,6 @@ from typing import Any
 
 from crew.experiments.constants import (
     CRAFTAX_CLASSIC_INTERMEDIATE_ACHIEVEMENT_IDS,
-    CRAFTAX_CLASSIC_SPARSE_ACHIEVEMENT_IDS,
 )
 
 DEFAULT_BASELINE_INTRINSIC_ALPHA = 0.2
@@ -22,7 +21,7 @@ NUM_ENVIRONMENTS_PER_BATCH = 1024  # Adapted for 16GB GPU memory
 def get_default_base_params() -> dict[str, Any]:
     return {
         "env_id": "Craftax-Classic-Symbolic-v1",
-        "achievement_ids_to_block": CRAFTAX_CLASSIC_SPARSE_ACHIEVEMENT_IDS,
+        "achievement_ids_to_block": CRAFTAX_CLASSIC_INTERMEDIATE_ACHIEVEMENT_IDS,
         "training_mode": "baseline",
         "episode_max_steps": 4096,
         "remove_health_reward": True,

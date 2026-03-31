@@ -72,7 +72,7 @@ import numpy as np
 import wandb
 
 from crew.experiments.run_training import run_main_algo_training
-from crew.experiments.tuning_configs import (
+from crew.hyp_tuning.tuning_configs import (
     DEFAULT_BASELINE_INTRINSIC_ALPHA as _DEFAULT_BASELINE_INTRINSIC_ALPHA,
     DEFAULT_INTRINSIC_MODULES,
     get_curriculum_base_config_for_modules,
