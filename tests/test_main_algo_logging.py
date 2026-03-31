@@ -4,11 +4,14 @@ from unittest import mock
 
 import jax.numpy as jnp
 import numpy as np
+from craftax.craftax_classic.constants import Achievement
 
 from crew.main_algo.logging import (
     build_eval_log_payload,
     build_training_batch_log_payload,
+    build_wandb_group,
     build_wandb_run_name,
+    build_wandb_tags,
     log_outer_batch_to_wandb,
 )
 
@@ -32,17 +35,39 @@ class _FakeWandb:
 
 
 class TestMainAlgoLogging(unittest.TestCase):
-    def test_build_wandb_run_name_includes_intrinsic_modules(self):
+    def test_build_wandb_identity_defaults_use_shared_experiment_identity(self):
+        blocked_ids = tuple(
+            achievement.value
+            for achievement in Achievement
+            if achievement not in (Achievement.COLLECT_WOOD, Achievement.PLACE_TABLE)
+        )
         config = SimpleNamespace(
             training_mode="curriculum",
             env_id="Craftax-Classic-Symbolic-v1",
+            achievement_ids_to_block=blocked_ids,
             train_seed=7,
             wandb_run_name=None,
-            selected_intrinsic_modules=("rnd", "foo"),
+            wandb_group=None,
+            wandb_tags=("paper", "algo:curriculum"),
+            selected_intrinsic_modules=("icm", "rnd"),
+            baseline_fixed_training_alpha=None,
         )
         self.assertEqual(
             build_wandb_run_name(config),
-            "curriculum|intr:rnd+foo|Craftax-Classic-Symbolic-v1|seed7",
+            "collect_wood+place_table/curriculum/icm+rnd|seed7",
+        )
+        self.assertEqual(
+            build_wandb_group(config),
+            "collect_wood+place_table/curriculum/icm+rnd",
+        )
+        self.assertEqual(
+            build_wandb_tags(config),
+            (
+                "task:collect_wood+place_table",
+                "algo:curriculum",
+                "intr:icm+rnd",
+                "paper",
+            ),
         )
 
     def test_build_training_batch_log_payload_splits_reward_vector_metrics(self):

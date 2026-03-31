@@ -1,6 +1,5 @@
 from craftax.craftax_classic.constants import Achievement
 
-
 BASIC_ACHIEVEMENT_IDS = list(range(25))
 CRAFTAX_CLASSIC_INTERMEDIATE_ACHIEVEMENT_IDS = [
     Achievement.COLLECT_WOOD.value,  # 0  -> Place Table

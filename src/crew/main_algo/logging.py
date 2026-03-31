@@ -9,6 +9,7 @@ import jax.numpy as jnp
 import numpy as np
 
 import wandb
+from crew.experiments.identity import build_experiment_identity
 
 
 def build_reward_function_names(config: Any) -> tuple[str, ...]:
@@ -20,8 +21,20 @@ def build_wandb_run_name(config: Any) -> str:
     """Build deterministic default run name when no explicit name is provided."""
     if config.wandb_run_name is not None:
         return config.wandb_run_name
-    intrinsic_modules = "+".join(config.selected_intrinsic_modules) if config.selected_intrinsic_modules else "none"
-    return f"{config.training_mode}|intr:{intrinsic_modules}|{config.env_id}|seed{config.train_seed}"
+    return build_experiment_identity(config).run_name
+
+
+def build_wandb_group(config: Any) -> str:
+    """Build deterministic default run group when no explicit group is provided."""
+    if config.wandb_group is not None:
+        return config.wandb_group
+    return build_experiment_identity(config).run_group
+
+
+def build_wandb_tags(config: Any) -> tuple[str, ...]:
+    """Build stable default tags merged with user-provided tags."""
+    identity = build_experiment_identity(config)
+    return tuple(dict.fromkeys((*identity.tags, *tuple(config.wandb_tags))))
 
 
 def init_wandb_run(config: Any) -> Any | None:
@@ -36,9 +49,9 @@ def init_wandb_run(config: Any) -> Any | None:
     return wandb.init(
         project=config.wandb_project,
         entity=config.wandb_entity,
-        group=config.wandb_group,
+        group=build_wandb_group(config),
         name=build_wandb_run_name(config),
-        tags=list(config.wandb_tags),
+        tags=list(build_wandb_tags(config)),
         config=dataclasses.asdict(config),
     )
 

@@ -37,14 +37,15 @@ def _build_intrinsic_placeholder_base_config(module_name: str, specific_config: 
 
 
 def _build_curriculum_placeholder_base_config(module_names: tuple[str, ...]) -> dict[str, Any]:
-    num_rewards = 1 + len(module_names)
+    canonical_module_names = tuple(sorted(module_names))
+    num_rewards = 1 + len(canonical_module_names)
     equal_alpha = 1.0 / num_rewards
     mixed_alpha = tuple(equal_alpha for _ in range(num_rewards))
     extrinsic_only_alpha = tuple(1.0 if idx == 0 else 0.0 for idx in range(num_rewards))
     return {
         **ACTIVE_GENERIC_BASE_CONFIG,
         "training_mode": "curriculum",
-        "selected_intrinsic_modules": module_names,
+        "selected_intrinsic_modules": canonical_module_names,
         "evaluation_alphas": (mixed_alpha, extrinsic_only_alpha),
     }
 

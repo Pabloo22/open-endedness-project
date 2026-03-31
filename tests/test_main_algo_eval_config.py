@@ -1,6 +1,7 @@
 import unittest
 
 import numpy as np
+from craftax.craftax_classic.constants import Achievement
 
 from crew.main_algo.config import TrainConfig
 
@@ -197,6 +198,26 @@ class TestMainAlgoEvalConfig(unittest.TestCase):
                 training_mode="baseline",
                 selected_intrinsic_modules=("rnd",),
                 baseline_fixed_training_alpha=(-0.1, 1.1),
+            )
+
+    def test_non_canonical_selected_intrinsic_modules_raise(self):
+        with self.assertRaisesRegex(ValueError, "canonical alphabetical order"):
+            TrainConfig(
+                **_base_config_kwargs(),
+                selected_intrinsic_modules=("rnd", "icm"),
+            )
+
+    def test_invalid_or_empty_extrinsic_task_set_raises(self):
+        with self.assertRaisesRegex(ValueError, "not valid for the configured environment"):
+            TrainConfig(
+                **_base_config_kwargs(),
+                achievement_ids_to_block=(999,),
+            )
+
+        with self.assertRaisesRegex(ValueError, "must remain unblocked"):
+            TrainConfig(
+                **_base_config_kwargs(),
+                achievement_ids_to_block=tuple(achievement.value for achievement in Achievement),
             )
 
 
