@@ -4,8 +4,6 @@
 
 - RND (only inventory) 
 
-- NGU (only inventory) 
-
 - ICM (full observation)
 
 
@@ -15,15 +13,21 @@
 
 **1 ACHIEVEMENT EXPERIMENTS**
 
-We will pick 2-3 of the achievements from craftax classic.
+We pick 2 of the achievements from craftax classic.
+
+collect iron (500 M steps)
+
+make stone sword (500 M steps)
 
 **2 ACHIEVEMENT EXPERIMENTS**
 
-We will pick pairs of 2 achievements. eg: place plant + eat plant, or make wood pickaxe + collect iron
+We pick pairs of 2 achievements.
 
+furnace + iron pickaxe (1B)
+
+defeat skeleton + make stone pickaxe (500 M)
 
 ## OTHER EXPERIMENTAL DETAILS:
-- length of runs: All runs are equal length.
 - We fix all hyperparameters that aren't the reward functions weights (no tuning). We have to put the final values we use on the main config.py file.
 
 
