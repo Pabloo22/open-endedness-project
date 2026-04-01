@@ -27,7 +27,7 @@ class RNDConfig:
 
     predictor_network_lr: float = 1e-4
     predictor_update_epochs: int = 1
-    predictor_num_minibatches: int = 128
+    predictor_num_minibatches: int = 64
     num_chunks_in_rewards_computation: int = 64
     gamma: float = 0.995
     gae_lambda: float = 0.95
@@ -51,7 +51,7 @@ class ICMConfig:
     reward_eta: float = 0.01
     beta: float = 0.2
     update_epochs: int = 1
-    num_minibatches: int = 128
+    num_minibatches: int = 64
     num_chunks_in_rewards_computation: int = 64
     eps: float = 1e-8
 

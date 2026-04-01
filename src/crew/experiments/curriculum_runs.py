@@ -1,5 +1,3 @@
-"""Run the final paper curriculum experiments by editing the variables below."""
-
 from __future__ import annotations
 
 import random
@@ -31,7 +29,7 @@ INTRINSIC_MODULE_SELECTION_SEED = 0
 EVALUATION_GRID_SIZE = 8
 
 TRAIN_SEEDS = (1, 2, 3)
-SAVE_RESULTS = False
+SAVE_RESULTS = True
 
 
 def main() -> None:
