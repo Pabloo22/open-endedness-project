@@ -72,7 +72,7 @@ def main() -> None:
 
     total_achievements = len(ORDERED_ACHIEVEMENTS_BY_ENV[ENV_ID])
     num_extrinsic_achievements = total_achievements - len(achievement_ids_to_block)
-    total_runs = (1 + len(sampled_fixed_alphas)) * len(TRAIN_SEEDS)
+    total_runs = (int(RUN_EXTRINSIC_ONLY_BASELINE) + len(sampled_fixed_alphas)) * len(TRAIN_SEEDS)
 
     print(
         f"extrinsic_achievements={tuple(achievement.name.lower() for achievement in EXTRINSIC_ACHIEVEMENTS)} "
