@@ -219,6 +219,6 @@ algorithm_design.md
 evaluation_plan.md
 saved_and_logged_metrics.md
 wandb/
-nohup.out
+nohup*.out
 CLAUDE_HANDOFF_IMPLEMENT_NGU_V2.md
 ##--##

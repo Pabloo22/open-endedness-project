@@ -1,3 +1,5 @@
+"""nohup poetry run python -m crew.experiments.fixed_weighting_runs >& nohup_2.out &"""
+
 from __future__ import annotations
 
 import random
@@ -18,8 +20,8 @@ ENV_ID = "Craftax-Classic-Symbolic-v1"
 
 # Keep these as Craftax Classic `Achievement` enum members.
 EXTRINSIC_ACHIEVEMENTS = (
-    Achievement.MAKE_WOOD_PICKAXE,
-    Achievement.COLLECT_IRON,
+    Achievement.MAKE_IRON_PICKAXE,
+    Achievement.PLACE_FURNACE,
 )
 
 # Choose from the registered intrinsic module names. If there are more than two,
@@ -32,8 +34,12 @@ TRAIN_SEEDS = (1, 2, 3)
 SAVE_RESULTS = True
 
 # This does not count the separate extrinsic-only run.
-NUM_FIXED_WEIGHTINGS = 9
-FIXED_WEIGHTING_SELECTION_SEED = 0
+NUM_FIXED_WEIGHTINGS = 3
+FIXED_WEIGHTING_SELECTION_SEED = 2222
+
+# Set this from 0, 1, or 2 depending on the GPU you are running on.
+WORKER_INDEX = 2
+RUN_EXTRINSIC_ONLY_BASELINE = WORKER_INDEX == 0  # To avoid duplicates
 
 
 def main() -> None:
@@ -53,14 +59,20 @@ def main() -> None:
     candidate_fixed_alphas = tuple(alpha for alpha in valid_grid_alphas if alpha != extrinsic_only_alpha)
     if NUM_FIXED_WEIGHTINGS > len(candidate_fixed_alphas):
         raise ValueError("NUM_FIXED_WEIGHTINGS is larger than the number of available fixed weightings in the grid.")
+    if WORKER_INDEX * NUM_FIXED_WEIGHTINGS >= len(candidate_fixed_alphas):
+        raise ValueError("WORKER_INDEX is too large, it exceeds the available fixed weightings.")
 
-    sampled_fixed_alphas = tuple(
-        random.Random(FIXED_WEIGHTING_SELECTION_SEED).sample(list(candidate_fixed_alphas), k=NUM_FIXED_WEIGHTINGS)
+    # Shuffle all available alphas with a common seed, then take a non-overlapping slice for this worker
+    shuffled_candidate_alphas = random.Random(FIXED_WEIGHTING_SELECTION_SEED).sample(
+        list(candidate_fixed_alphas), k=len(candidate_fixed_alphas)
     )
+    start_idx = WORKER_INDEX * NUM_FIXED_WEIGHTINGS
+    end_idx = start_idx + NUM_FIXED_WEIGHTINGS
+    sampled_fixed_alphas = tuple(shuffled_candidate_alphas[start_idx:end_idx])
 
     total_achievements = len(ORDERED_ACHIEVEMENTS_BY_ENV[ENV_ID])
     num_extrinsic_achievements = total_achievements - len(achievement_ids_to_block)
-    total_runs = (1 + len(sampled_fixed_alphas)) * len(TRAIN_SEEDS)
+    total_runs = (int(RUN_EXTRINSIC_ONLY_BASELINE) + len(sampled_fixed_alphas)) * len(TRAIN_SEEDS)
 
     print(
         f"extrinsic_achievements={tuple(achievement.name.lower() for achievement in EXTRINSIC_ACHIEVEMENTS)} "
@@ -72,7 +84,8 @@ def main() -> None:
     print(f"train_seeds={tuple(TRAIN_SEEDS)}")
     print(f"total_runs={total_runs}")
 
-    for fixed_alpha in (extrinsic_only_alpha, *sampled_fixed_alphas):
+    alphas = (extrinsic_only_alpha, *sampled_fixed_alphas) if RUN_EXTRINSIC_ONLY_BASELINE else sampled_fixed_alphas
+    for fixed_alpha in alphas:
         for train_seed in TRAIN_SEEDS:
             config = TrainConfig(
                 training_mode="baseline",
@@ -85,6 +98,8 @@ def main() -> None:
                 eval_every_n_batches=2,
                 eval_num_envs=256,
                 eval_num_episodes=1,
+                total_timesteps=1_000_000_000,
+                video_num_episodes=2,
             )
             print(f"Starting fixed weighting run for alpha={fixed_alpha} train_seed={train_seed}")
             run_main_algo_training(config=config, save_results=SAVE_RESULTS)
