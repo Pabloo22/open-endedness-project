@@ -60,9 +60,8 @@ class TestTrainOneIterationResetBehavior(unittest.TestCase):
         captured: dict[str, object] = {}
 
         def fake_scan(fn, init, xs, length):  # noqa: ARG001
-            captured["scan_init_reward_stats"] = init.reward_normalization_stats
+            captured["scan_init_reward_stats"] = init[0].reward_normalization_stats
             inner_metrics = {"dummy_metric": jnp.zeros((config.num_updates_per_batch,), dtype=jnp.float32)}
-            intrinsic_data = {"obs": jnp.zeros((config.num_updates_per_batch, 1, config.num_envs_per_batch, 1))}
             lp_data = LpEstimationData(
                 raw_rewards=jnp.zeros(
                     (config.num_updates_per_batch, 1, config.num_envs_per_batch, config.num_reward_functions),
@@ -73,7 +72,7 @@ class TestTrainOneIterationResetBehavior(unittest.TestCase):
                     dtype=jnp.bool_,
                 ),
             )
-            return init, (inner_metrics, intrinsic_data, lp_data)
+            return init, (inner_metrics, lp_data)
 
         with (
             mock.patch(
@@ -85,10 +84,6 @@ class TestTrainOneIterationResetBehavior(unittest.TestCase):
                 ),
             ),
             mock.patch("crew.main_algo.main_loop.jax.lax.scan", side_effect=fake_scan),
-            mock.patch(
-                "crew.main_algo.main_loop.update_intrinsic_modules",
-                return_value=(jax.random.key(2), (), {"intrinsic_modules/rnd/predictor_loss": jnp.array(0.0)}),
-            ),
             mock.patch(
                 "crew.main_algo.main_loop.update_lp_normalization_stats_from_data",
                 return_value=SimpleNamespace(var=jnp.ones((config.num_reward_functions,), dtype=jnp.float32)),
@@ -151,6 +146,119 @@ class TestTrainOneIterationResetBehavior(unittest.TestCase):
             np.asarray(stats_with_reset.previous_done),
             np.asarray([[False, False], [False, False]], dtype=bool),
         )
+
+    def test_reward_side_intrinsic_states_stay_frozen_while_learner_states_advance(self):
+        config = _build_test_config(reset_running_return=False)
+        config.num_updates_per_batch = 2
+        reward_stats = init_reward_normalization_stats(
+            num_envs=config.num_envs_per_batch,
+            num_reward_functions=config.num_reward_functions,
+        )
+        curriculum_state = CurriculumState(
+            alpha_score_replay_buffer=object(),
+            score_predictor_train_state=object(),
+            lp_normalization_stats=object(),
+            num_batches_seen=jnp.array(0, dtype=jnp.int32),
+        )
+
+        reward_state_calls: list[tuple[int, ...]] = []
+        learner_state_calls: list[tuple[int, ...]] = []
+
+        def fake_inner_update(
+            runner_state,
+            env,
+            env_params,
+            alpha_batch,
+            reward_intrinsic_states,
+            intrinsic_states_to_update,
+            intrinsic_modules,
+            config,
+        ):  # noqa: ARG001
+            del env, env_params, alpha_batch, intrinsic_modules
+            reward_state_calls.append(reward_intrinsic_states)
+            learner_state_calls.append(intrinsic_states_to_update)
+            next_intrinsic_states = tuple(state + 1 for state in intrinsic_states_to_update)
+            metrics = {
+                "dummy_metric": jnp.array(1.0, dtype=jnp.float32),
+                "intrinsic_modules/rnd/predictor_loss": jnp.array(2.0, dtype=jnp.float32),
+            }
+            lp_data = LpEstimationData(
+                raw_rewards=jnp.zeros((1, config.num_envs_per_batch, config.num_reward_functions), dtype=jnp.float32),
+                done_masks=jnp.zeros((1, config.num_envs_per_batch, config.num_reward_functions), dtype=jnp.bool_),
+            )
+            return runner_state, next_intrinsic_states, metrics, lp_data
+
+        def fake_scan(fn, init, xs, length):  # noqa: ARG001
+            carry = init
+            metrics_per_update = []
+            lp_data_per_update = []
+            for _ in range(length):
+                carry, (metrics, lp_data) = fn(carry, None)
+                metrics_per_update.append(metrics)
+                lp_data_per_update.append(lp_data)
+            stacked_metrics = jax.tree_util.tree_map(
+                lambda *values: jnp.stack(values, axis=0),
+                *metrics_per_update,
+            )
+            stacked_lp_data = jax.tree_util.tree_map(
+                lambda *values: jnp.stack(values, axis=0),
+                *lp_data_per_update,
+            )
+            return carry, (stacked_metrics, stacked_lp_data)
+
+        with (
+            mock.patch(
+                "crew.main_algo.main_loop.sample_alpha_batch",
+                return_value=(
+                    jax.random.key(1),
+                    jnp.asarray([[0.6, 0.4], [0.2, 0.8]], dtype=jnp.float32),
+                    {"curriculum/pred_score_mean": jnp.array(0.0, dtype=jnp.float32)},
+                ),
+            ),
+            mock.patch("crew.main_algo.main_loop.jax.lax.scan", side_effect=fake_scan),
+            mock.patch(
+                "crew.main_algo.main_loop.collect_data_and_update_agent_and_intrinsic_modules",
+                side_effect=fake_inner_update,
+            ),
+            mock.patch(
+                "crew.main_algo.main_loop.update_lp_normalization_stats_from_data",
+                return_value=SimpleNamespace(var=jnp.ones((config.num_reward_functions,), dtype=jnp.float32)),
+            ),
+            mock.patch(
+                "crew.main_algo.main_loop.estimate_lp_per_reward_function",
+                return_value=(
+                    jnp.zeros((config.num_envs_per_batch, config.num_reward_functions), dtype=jnp.float32),
+                    jnp.zeros((config.num_envs_per_batch,), dtype=jnp.int32),
+                ),
+            ),
+            mock.patch(
+                "crew.main_algo.main_loop.compute_scores",
+                return_value=(
+                    jnp.zeros((config.num_envs_per_batch,), dtype=jnp.float32),
+                    {"curriculum/score_mean": jnp.array(0.0, dtype=jnp.float32)},
+                ),
+            ),
+            mock.patch("crew.main_algo.main_loop.add_alpha_score_batch", return_value=object()),
+            mock.patch(
+                "crew.main_algo.main_loop.train_score_predictor_on_buffer",
+                return_value=(jax.random.key(3), object(), {"curriculum/predictor_loss": jnp.array(0.0)}),
+            ),
+        ):
+            _, _, _, intrinsic_states, _, _ = train_one_iteration(
+                rng=jax.random.key(0),
+                agent_train_state=object(),
+                reward_normalization_stats=reward_stats,
+                intrinsic_states=(10, 20),
+                curriculum_state=curriculum_state,
+                env=_DummyResetOnlyEnv(),
+                env_params=object(),
+                intrinsic_modules=(),
+                config=config,
+            )
+
+        self.assertEqual(reward_state_calls, [(10, 20), (10, 20)])
+        self.assertEqual(learner_state_calls, [(10, 20), (11, 21)])
+        self.assertEqual(intrinsic_states, (12, 22))
 
 
 if __name__ == "__main__":

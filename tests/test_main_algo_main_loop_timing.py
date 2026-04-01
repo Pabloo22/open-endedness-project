@@ -57,6 +57,7 @@ def _build_test_config(is_timing_run: bool) -> SimpleNamespace:
         eval_num_envs=1,
         eval_num_episodes=1,
         evaluation_alphas_array=jnp.asarray([[1.0, 0.0]], dtype=jnp.float32),
+        video_num_episodes=0,
         is_timing_run=is_timing_run,
     )
 

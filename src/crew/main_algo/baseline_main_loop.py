@@ -7,11 +7,10 @@ import jax.tree_util as jtu
 from jax.tree_util import Partial
 
 from crew.main_algo.data_collection_and_agent_updates import (
-    collect_data_and_update_agent,
+    collect_data_and_update_agent_and_intrinsic_modules,
 )
 from crew.main_algo.evaluation import evaluate_policy_on_alphas, infer_achievement_names
 from crew.main_algo.intrinsic_modules.api import IntrinsicModule
-from crew.main_algo.intrinsic_modules.update_loop import update_intrinsic_modules
 from crew.main_algo.logging import (
     finish_wandb_run,
     init_wandb_run,
@@ -36,33 +35,16 @@ def train_one_iteration_baseline(
     config: Any,
 ) -> tuple[RunnerStateTransformer, IntrinsicStates, dict[str, jax.Array]]:
     """Run one baseline update: collect/update agent, then update intrinsic modules."""
-    (
-        runner_state,
-        (
-            agent_update_metrics,
-            intrinsic_modules_update_data,
-            _,
-        ),
-    ) = collect_data_and_update_agent(
+    runner_state, intrinsic_states, metrics, _ = collect_data_and_update_agent_and_intrinsic_modules(
         runner_state=runner_state,
-        _unused=None,
         env=env,
         env_params=env_params,
         alpha_batch=alpha_batch,
-        intrinsic_states=intrinsic_states,
+        reward_intrinsic_states=intrinsic_states,
+        intrinsic_states_to_update=intrinsic_states,
         intrinsic_modules=intrinsic_modules,
         config=config,
     )
-
-    rng, intrinsic_states, intrinsic_update_metrics = update_intrinsic_modules(
-        rng=runner_state.rng,
-        intrinsic_modules=intrinsic_modules,
-        intrinsic_states=intrinsic_states,
-        intrinsic_modules_update_data=intrinsic_modules_update_data,
-        config=config,
-    )
-    runner_state = runner_state.replace(rng=rng)
-    metrics = agent_update_metrics | intrinsic_update_metrics
     return runner_state, intrinsic_states, metrics
 
 

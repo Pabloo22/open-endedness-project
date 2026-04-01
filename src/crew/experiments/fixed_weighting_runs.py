@@ -34,12 +34,12 @@ TRAIN_SEEDS = (1, 2, 3)
 SAVE_RESULTS = True
 
 # This does not count the separate extrinsic-only run.
-NUM_FIXED_WEIGHTINGS = 4
+NUM_FIXED_WEIGHTINGS = 5
 FIXED_WEIGHTING_SELECTION_SEED = 45456
 
 # Set this from 0, 1, or 2 depending on the GPU you are running on.
-WORKER_INDEX = 0
-RUN_EXTRINSIC_ONLY_BASELINE = True
+WORKER_INDEX = 1
+RUN_EXTRINSIC_ONLY_BASELINE = False
 
 
 def main() -> None:
