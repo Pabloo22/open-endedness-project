@@ -29,7 +29,7 @@ SAVE_RESULTS = True
 
 # This does not count the separate extrinsic-only run.
 NUM_FIXED_WEIGHTINGS = 3
-FIXED_WEIGHTING_SELECTION_SEED = 3690
+FIXED_WEIGHTING_SELECTION_SEED = 36900
 
 # Set this from 0, 1, or 2 depending on the GPU you are running on.
 WORKER_INDEX = 0
