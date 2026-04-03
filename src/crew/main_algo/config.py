@@ -198,7 +198,7 @@ class TrainConfig:
     wandb_run_name: str | None = None
     wandb_tags: tuple[str, ...] = ()
     wandb_group: str | None = None
-    wandb_entity: str | None = None
+    wandb_entity: str | None = "openendedness-2026"
     is_timing_run: bool = False
 
     SUPPORTED_ENV_IDS: ClassVar[tuple[str, ...]] = (

@@ -1,16 +1,14 @@
-"""Run the final paper curriculum experiments by editing the variables below."""
-
 from __future__ import annotations
 
 import random
 
 from craftax.craftax_classic.constants import Achievement
 
+from crew.experiments.identity import ORDERED_ACHIEVEMENTS_BY_ENV
 from crew.experiments.paper_run_utils import (
     build_achievement_ids_to_block,
     build_two_intrinsic_evaluation_alphas,
 )
-from crew.experiments.identity import ORDERED_ACHIEVEMENTS_BY_ENV
 from crew.experiments.run_training import run_main_algo_training
 from crew.main_algo.config import TrainConfig
 
@@ -20,8 +18,8 @@ ENV_ID = "Craftax-Classic-Symbolic-v1"
 
 # Keep these as Craftax Classic `Achievement` enum members.
 EXTRINSIC_ACHIEVEMENTS = (
-    Achievement.MAKE_WOOD_PICKAXE,
-    Achievement.COLLECT_IRON,
+    Achievement.DEFEAT_SKELETON,
+    Achievement.MAKE_STONE_PICKAXE,
 )
 
 # Choose from the registered intrinsic module names. Two are sampled once and reused for every seed.
@@ -68,8 +66,8 @@ def main() -> None:
             selected_intrinsic_modules=selected_intrinsic_modules,
             evaluation_alphas=evaluation_alphas,
             eval_every_n_batches=5,
-            eval_num_envs=64,
-            eval_num_episodes=4,
+            eval_num_envs=32,
+            eval_num_episodes=8,
         )
         print(f"Starting curriculum run for train_seed={train_seed}")
         run_main_algo_training(config=config, save_results=SAVE_RESULTS)

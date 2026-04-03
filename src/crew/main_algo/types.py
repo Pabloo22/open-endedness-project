@@ -64,7 +64,7 @@ class IntrinsicModulesUpdateData(struct.PyTreeNode):
 class LpEstimationData(struct.PyTreeNode):
     """Rollout data needed in the outer loop for LP estimation.
 
-    Shapes when returned from collect_data_and_update_agent:
+    Shapes when stacked across curriculum inner updates:
     - raw_rewards: [U, T, B, R]
     - done_masks: [U, T, B, R]
     """

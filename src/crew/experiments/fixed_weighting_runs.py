@@ -20,8 +20,8 @@ ENV_ID = "Craftax-Classic-Symbolic-v1"
 
 # Keep these as Craftax Classic `Achievement` enum members.
 EXTRINSIC_ACHIEVEMENTS = (
-    Achievement.MAKE_IRON_PICKAXE,
-    Achievement.PLACE_FURNACE,
+    Achievement.DEFEAT_SKELETON,
+    Achievement.MAKE_STONE_PICKAXE,
 )
 
 # Choose from the registered intrinsic module names. If there are more than two,
@@ -34,12 +34,12 @@ TRAIN_SEEDS = (1, 2, 3)
 SAVE_RESULTS = True
 
 # This does not count the separate extrinsic-only run.
-NUM_FIXED_WEIGHTINGS = 3
-FIXED_WEIGHTING_SELECTION_SEED = 2222
+NUM_FIXED_WEIGHTINGS = 5
+FIXED_WEIGHTING_SELECTION_SEED = 45456
 
 # Set this from 0, 1, or 2 depending on the GPU you are running on.
-WORKER_INDEX = 2
-RUN_EXTRINSIC_ONLY_BASELINE = WORKER_INDEX == 0  # To avoid duplicates
+WORKER_INDEX = 1
+RUN_EXTRINSIC_ONLY_BASELINE = False
 
 
 def main() -> None:
@@ -98,8 +98,7 @@ def main() -> None:
                 eval_every_n_batches=2,
                 eval_num_envs=256,
                 eval_num_episodes=1,
-                total_timesteps=1_000_000_000,
-                video_num_episodes=2,
+                total_timesteps=500_000_000,
             )
             print(f"Starting fixed weighting run for alpha={fixed_alpha} train_seed={train_seed}")
             run_main_algo_training(config=config, save_results=SAVE_RESULTS)

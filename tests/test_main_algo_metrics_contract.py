@@ -50,10 +50,10 @@ class TestMainAlgoMetricsContract(unittest.TestCase):
 
         config = TrainConfig(
             train_seed=0,
-            total_timesteps=16,
+            total_timesteps=32,
             env_id="Craftax-Classic-Symbolic-v1",
             num_envs_per_batch=4,
-            num_steps_per_env=4,
+            num_steps_per_env=8,
             num_steps_per_update=4,
             update_epochs=1,
             num_minibatches=1,

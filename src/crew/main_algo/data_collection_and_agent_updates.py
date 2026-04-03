@@ -11,6 +11,7 @@ from crew.main_algo.advantage_computation import (
     normalize_advantages,
 )
 from crew.main_algo.intrinsic_modules.api import IntrinsicModule
+from crew.main_algo.intrinsic_modules.update_loop import update_intrinsic_modules
 from crew.main_algo.ppo import update_agent
 from crew.main_algo.reward_normalization import (
     compute_forward_returns,
@@ -282,20 +283,28 @@ def collect_data(
     return runner_state, transitions, memories_batch
 
 
-def collect_data_and_update_agent(
+def collect_data_and_update_agent_and_intrinsic_modules(
     runner_state: RunnerStateTransformer,
-    _unused: Any,
     env: Any,
     env_params: Any,
     alpha_batch: jax.Array,
-    intrinsic_states: IntrinsicStates,
+    reward_intrinsic_states: IntrinsicStates,
+    intrinsic_states_to_update: IntrinsicStates,
     intrinsic_modules: tuple[IntrinsicModule, ...],
     config: Any,
 ) -> tuple[
     RunnerStateTransformer,
-    tuple[dict[str, jax.Array], IntrinsicModulesUpdateData, LpEstimationData],
+    IntrinsicStates,
+    dict[str, jax.Array],
+    LpEstimationData,
 ]:
-    """Collect rollout data, preprocess rewards/advantages, and run PPO updates."""
+    """Collect rollout data, update the agent, then update intrinsic modules.
+
+    Inputs:
+    - alpha_batch: [B, R]
+    - reward_intrinsic_states: states used for intrinsic reward computation
+    - intrinsic_states_to_update: states optimized after this update
+    """
     memories_previous = runner_state.memories
 
     runner_state, transitions, memories_batch = collect_data(
@@ -310,7 +319,7 @@ def collect_data_and_update_agent(
     rng, rewards, done = compute_intrinsic_rewards_and_done_masks(
         rng=runner_state.rng,
         intrinsic_modules=intrinsic_modules,
-        intrinsic_states=intrinsic_states,
+        intrinsic_states=reward_intrinsic_states,
         transitions=transitions,
         config=config,
     )
@@ -371,6 +380,13 @@ def collect_data_and_update_agent(
         action=transitions.action,
         done=transitions.done,
     )
+    rng, intrinsic_states_to_update, intrinsic_update_metrics = update_intrinsic_modules(
+        rng=rng,
+        intrinsic_modules=intrinsic_modules,
+        intrinsic_states=intrinsic_states_to_update,
+        intrinsic_modules_update_data=intrinsic_modules_update_data,
+        config=config,
+    )
 
     lp_estimation_data = LpEstimationData(
         raw_rewards=rewards,
@@ -383,11 +399,6 @@ def collect_data_and_update_agent(
         reward_normalization_stats=reward_normalization_stats,
     )
 
-    return (
-        updated_runner_state,
-        (
-            metrics,
-            intrinsic_modules_update_data,
-            lp_estimation_data,
-        ),
-    )
+    metrics = metrics | intrinsic_update_metrics
+
+    return updated_runner_state, intrinsic_states_to_update, metrics, lp_estimation_data
