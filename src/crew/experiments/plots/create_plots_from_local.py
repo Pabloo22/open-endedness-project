@@ -1,0 +1,172 @@
+import os
+import re
+from pathlib import Path
+import pandas as pd
+import numpy as np
+import orbax.checkpoint as ocp
+from crew.experiments.plots.plot_functions import plot_1_heatmaps, plot_2_learning_curves
+
+# ==========================================
+# CONFIGURATION
+# ==========================================
+ARTIFACTS_DIR = "artifacts/training_results"
+ACHIEVEMENT_FILTER = "place_furnace+make_iron_pickaxe"
+
+
+# ==========================================
+# HELPER FUNCTIONS
+# ==========================================
+def parse_weights_from_dirname(dirname):
+    """
+    Parses a directory name like 'icm0p125+rnd0' into floats.
+    Returns: icm_weight, rnd_weight
+    """
+    pattern = r"^icm(.*)\+rnd(.*?)$"
+    match = re.match(pattern, dirname)
+    if not match:
+        return 0.0, 0.0
+
+    icm_str, rnd_str = match.groups()
+    icm_weight = float(icm_str.replace("p", ".")) if icm_str else 0.0
+    rnd_weight = float(rnd_str.replace("p", ".")) if rnd_str else 0.0
+
+    return icm_weight, rnd_weight
+
+
+def load_local_orbax_data(base_dir, achievement):
+    """
+    Walks the local directory structure, loads Orbax checkpoints,
+    processes raw multi-dimensional JAX arrays, and returns a pandas DataFrame.
+    """
+    target_dir = Path(base_dir) / achievement
+    if not target_dir.exists():
+        print(f"Error: Directory {target_dir} does not exist.")
+        return pd.DataFrame()
+
+    checkpointer = ocp.PyTreeCheckpointer()
+    data = []
+
+    print(f"Scanning local directory: {target_dir}...")
+
+    for run_type_dir in target_dir.iterdir():
+        if not run_type_dir.is_dir():
+            continue
+        run_type = run_type_dir.name
+
+        for weights_dir in run_type_dir.iterdir():
+            if not weights_dir.is_dir():
+                continue
+            icm_weight, rnd_weight = parse_weights_from_dirname(weights_dir.name)
+
+            for seed_dir in weights_dir.iterdir():
+                if not seed_dir.is_dir() or not seed_dir.name.startswith("seed"):
+                    continue
+
+                seed = int(seed_dir.name.replace("seed", ""))
+                checkpoint_path = seed_dir.resolve()
+
+                print(f"Loading: {run_type} | ICM: {icm_weight} | RND: {rnd_weight} | Seed: {seed}")
+
+                try:
+                    restored_pytree = checkpointer.restore(os.path.abspath(checkpoint_path))
+                    metrics = restored_pytree.get("metrics", {})
+
+                    if not metrics:
+                        print(f"  -> Warning: No metrics found in {checkpoint_path}")
+                        continue
+
+                    # 1. Fetch raw arrays and convert to standard NumPy to avoid JAX device quirks
+                    if "eval/total_steps" not in metrics or "eval/returns" not in metrics:
+                        print(f"  -> Warning: Required metric arrays missing in {checkpoint_path}")
+                        continue
+
+                    steps_array = np.asarray(metrics["eval/total_steps"])
+                    raw_returns = np.asarray(metrics["eval/returns"])  # Shape: (T, Alphas, Envs, Episodes)
+
+                    # 2. Process the 4D returns array into a 1D array of means
+                    if run_type == "baseline":
+                        # Average across Alphas (1), Envs (256), and Episodes (1)
+                        returns_array = np.mean(raw_returns, axis=(1, 2, 3))
+                    else:
+                        # For curriculum, we must find which index represents the extrinsic-only alpha
+                        alphas = np.asarray(metrics.get("eval/alphas", [[1.0, 0.0, 0.0]]))
+                        target_alpha = np.array([1.0, 0.0, 0.0])
+
+                        # Find the index where the alpha matches our target
+                        matches = np.all(np.isclose(alphas, target_alpha), axis=-1)
+                        if np.any(matches):
+                            alpha_idx = np.argmax(matches)
+                        else:
+                            print(f"  -> Warning: Extrinsic-only alpha not found in eval/alphas. Defaulting to 0.")
+                            alpha_idx = 0
+
+                        # Average only across Envs and Episodes for the specific alpha
+                        returns_array = np.mean(raw_returns[:, alpha_idx, :, :], axis=(1, 2))
+
+                    # 3. Build safe DataFrame
+                    min_len = min(len(steps_array), len(returns_array))
+                    history = pd.DataFrame(
+                        {"eval/total_steps": steps_array[:min_len], "standardized_return_mean": returns_array[:min_len]}
+                    )
+
+                    history = history.dropna(subset=["eval/total_steps", "standardized_return_mean"])
+
+                    if history.empty:
+                        print(f"  -> Warning: Metric arrays were empty after cleaning.")
+                        continue
+
+                    final_performance = history["standardized_return_mean"].iloc[-1]
+
+                    data.append(
+                        {
+                            "run_id": f"{run_type}_{weights_dir.name}_{seed_dir.name}",
+                            "run_type": run_type,
+                            "icm_weight": icm_weight,
+                            "rnd_weight": rnd_weight,
+                            "extrinsic_weight": round(1.0 - icm_weight - rnd_weight, 2),
+                            "seed": seed,
+                            "final_performance": final_performance,
+                            "history": history,
+                        }
+                    )
+
+                except Exception as e:
+                    print(f"  -> Failed to load {checkpoint_path}: {e}")
+
+    return pd.DataFrame(data)
+
+
+# ==========================================
+# MAIN EXECUTION
+# ==========================================
+if __name__ == "__main__":
+    # 1. Fetch data locally instead of from W&B
+    df = load_local_orbax_data(ARTIFACTS_DIR, ACHIEVEMENT_FILTER)
+
+    if not df.empty:
+        print(f"\nSuccessfully loaded {len(df)} local runs. Ready to plot!")
+
+        # 2. You can now pass this `df` directly to the plotting functions from the previous script!
+        plot_1_heatmaps(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
+        plot_2_learning_curves(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
+
+    else:
+        print("No valid local data found.")
+    # import os
+    # import orbax.checkpoint as ocp
+
+    # # Pointing exactly to the run that failed
+    # path = "/cs/student/msc/ml/2025/parinofe/open-endedness-project/artifacts/training_results/place_furnace+make_iron_pickaxe/baseline/icm0+rnd0p25/seed3"
+
+    # checkpointer = ocp.PyTreeCheckpointer()
+    # data = checkpointer.restore(os.path.abspath(path))
+    # metrics = data.get("metrics", {})
+
+    # print("Available keys in 'metrics':")
+    # for key, value in metrics.items():
+    #     if hasattr(value, "shape"):
+    #         print(f" - '{key}': array shape {value.shape}")
+    #     elif isinstance(value, dict):
+    #         print(f" - '{key}': nested dictionary with keys {list(value.keys())}")
+    #     else:
+    #         print(f" - '{key}': {type(value)}")
