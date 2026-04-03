@@ -3,13 +3,15 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 import pandas as pd
 import numpy as np
+from matplotlib.colors import ListedColormap
 
 
 def plot_1_heatmaps(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe", grid_size=8):
     plt.style.use("ggplot")
     step = 1.0 / grid_size
-    grid_indices = np.round(np.arange(0, 0.5 + step / 2, step), 3)
+    grid_indices = np.round(np.arange(0, 0.875 + step / 2, step), 3)
     grid_dim = len(grid_indices)
+    max_score = len(achievement_filter.split("+")) if achievement_filter else 1.0
 
     def create_grid(run_type):
         grid = np.full((grid_dim, grid_dim), np.nan)
@@ -23,8 +25,8 @@ def plot_1_heatmaps(df, save_dir, achievement_filter="place_furnace+make_iron_pi
 
         for i, icm in enumerate(grid_indices):
             for j, rnd in enumerate(grid_indices):
-                # allow a bit of floating point tolerance for the max sum which is 1.0
-                if round(icm + rnd, 3) > 1.0:
+                # allow a bit of floating point tolerance for the max sum which is 0.9
+                if round(icm + rnd, 3) > 0.9:
                     mask_invalid[i, j] = True
                 else:
                     match = grouped[
@@ -47,20 +49,32 @@ def plot_1_heatmaps(df, save_dir, achievement_filter="place_furnace+make_iron_pi
     ]
 
     for grid, mask, filename in plot_configs:
-        plt.figure(figsize=(8, 7))
+        fig, ax = plt.subplots(figsize=(8, 7))
+        ax.set_facecolor("lightgray")
+
         sns.heatmap(
             grid,
-            mask=mask,
             cmap=cmap,
             annot=True,
             fmt=".2f",
+            vmin=0.0,
+            vmax=max_score,
             xticklabels=grid_indices,
             yticklabels=grid_indices,
             cbar_kws={"label": "Mean Final Return"},
+            ax=ax,
         )
 
-        ax = plt.gca()
-        ax.set_facecolor("black")
+        sns.heatmap(
+            mask,
+            mask=~mask,
+            cmap=ListedColormap(["black"]),
+            cbar=False,
+            xticklabels=grid_indices,
+            yticklabels=grid_indices,
+            ax=ax,
+        )
+
         ax.set_xlabel("RND Weight")
         ax.set_ylabel("ICM Weight")
         ax.invert_yaxis()
@@ -79,18 +93,76 @@ def plot_2_learning_curves(df, save_dir, achievement_filter="place_furnace+make_
     plt.style.use("ggplot")
     plt.figure(figsize=(10, 6))
 
-    ext_only_df = df[(df["run_type"] == "baseline") & (df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0)]
-    fixed_search_df = df[(df["run_type"] == "baseline") & ~((df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0))]
-    best_fixed_weights = None
+    def get_best_run(search_df):
+        if search_df.empty:
+            return None, None
 
-    if not fixed_search_df.empty:
-        mean_perfs = fixed_search_df.groupby(["icm_weight", "rnd_weight"])["final_performance"].mean()
-        if not mean_perfs.empty:
-            best_icm, best_rnd = mean_perfs.idxmax()
-            best_fixed_df = fixed_search_df[
-                (fixed_search_df["icm_weight"] == best_icm) & (fixed_search_df["rnd_weight"] == best_rnd)
+        # 1. Compute mean final performance for each configuration
+        mean_perfs = search_df.groupby(["icm_weight", "rnd_weight"])["final_performance"].mean().reset_index()
+        if mean_perfs.empty:
+            return None, None
+
+        max_perf = mean_perfs["final_performance"].max()
+
+        # 2. Filter candidates within a 0.02 tolerance of the maximum performance
+        candidates = mean_perfs[mean_perfs["final_performance"] >= max_perf - 0.02]
+
+        best_metric = -np.inf
+        best_weights = None
+
+        # 3. For each candidate, calculate area under curve surrogate (mean of history) to find fastest learner
+        for _, row in candidates.iterrows():
+            icm, rnd = row["icm_weight"], row["rnd_weight"]
+            cand_df = search_df[(search_df["icm_weight"] == icm) & (search_df["rnd_weight"] == rnd)]
+
+            histories = pd.concat(cand_df["history"].tolist())
+            auc_surrogate = histories["standardized_return_mean"].mean()
+
+            if auc_surrogate > best_metric:
+                best_metric = auc_surrogate
+                best_weights = (icm, rnd)
+
+        if best_weights:
+            best_df = search_df[
+                (search_df["icm_weight"] == best_weights[0]) & (search_df["rnd_weight"] == best_weights[1])
             ]
-            best_fixed_weights = (best_icm, best_rnd)
+            return best_weights, best_df
+        return None, None
+
+    ext_only_df = df[(df["run_type"] == "baseline") & (df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0)]
+
+    fixed_search_df = df[(df["run_type"] == "baseline") & ~((df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0))]
+    best_fixed_weights, best_fixed_df = get_best_run(fixed_search_df)
+
+    # For curriculum, we pick the best alpha value for each timestep individually for each seed.
+    # With those values (one per seed), the plot_curve function will compute the mean, min, and max.
+    curr_search_df = df[df["run_type"] == "curriculum"]
+    best_curr_df = pd.DataFrame()
+    if not curr_search_df.empty:
+        # Explode histories to get all time steps
+        all_curr_histories = []
+        for _, row in curr_search_df.iterrows():
+            hist = row["history"].copy()
+            hist["seed"] = row["seed"]
+            hist["alpha_id"] = f"{row['icm_weight']}_{row['rnd_weight']}"
+            all_curr_histories.append(hist)
+
+        curr_histories_df = pd.concat(all_curr_histories)
+
+        # For each seed and for each timestep, take the maximum return across all alphas
+        best_per_step_seed = (
+            curr_histories_df.groupby(["eval/total_steps", "seed"])["standardized_return_mean"].max().reset_index()
+        )
+
+        # Package this back into a format that plot_curve expects (a df with a 'history' column holding dfs)
+        best_curr_run_data = []
+        for seed in best_per_step_seed["seed"].unique():
+            seed_hist = best_per_step_seed[best_per_step_seed["seed"] == seed][
+                ["eval/total_steps", "standardized_return_mean"]
+            ]
+            best_curr_run_data.append({"history": seed_hist})
+
+        best_curr_df = pd.DataFrame(best_curr_run_data)
 
     def plot_curve(subset_df, label, color):
         if subset_df is None or subset_df.empty:
@@ -111,12 +183,15 @@ def plot_2_learning_curves(df, save_dir, achievement_filter="place_furnace+make_
             alpha=0.2,
         )
 
-    plot_curve(ext_only_df, "Extrinsic Only (ICM=0.0, RND=0.0)", "blue")
+    plot_curve(ext_only_df, "Extrinsic Only", "blue")
 
     if best_fixed_weights:
         plot_curve(
             best_fixed_df, f"Best Fixed Weights (ICM={best_fixed_weights[0]}, RND={best_fixed_weights[1]})", "orange"
         )
+
+    if not best_curr_df.empty:
+        plot_curve(best_curr_df, "Curriculum Method (Ours)", "green")
 
     plt.xlabel("Total Environment Steps")
     plt.ylabel("Extrinsic Return (Mean)")

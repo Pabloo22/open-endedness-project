@@ -1,3 +1,44 @@
+"""Creates the plots for the paper using local data.
+
+Available keys in 'metrics' for the currriculum run:
+ - 'curriculum/alpha/entropy_mean': array shape (239,)
+ - 'curriculum/alpha/extrinsic_weight_per_env': array shape (239, 1024)
+ - 'curriculum/alpha/mean_per_reward_function': array shape (239, 3)
+ - 'curriculum/alpha/per_env': array shape (239, 1024, 3)
+ - 'curriculum/alpha/std_per_reward_function': array shape (239, 3)
+ - 'curriculum/completed_episodes_per_env_mean': array shape (239,)
+ - 'curriculum/lp_per_reward_function': array shape (239, 3)
+ - 'curriculum/pred_score_mean': array shape (239,)
+ - 'curriculum/predictor_loss': array shape (239,)
+ - 'curriculum/score_mean': array shape (239,)
+ - 'curriculum/valid_fraction_of_scores_in_batch': array shape (239,)
+ - 'eval/achievement_names': <class 'list'>
+ - 'eval/achievements': array shape (48, 36, 32, 8, 22)
+ - 'eval/alphas': array shape (36, 3)
+ - 'eval/batch_idx': array shape (48,)
+ - 'eval/lengths': array shape (48, 36, 32, 8)
+ - 'eval/returns': array shape (48, 36, 32, 8)
+ - 'eval/total_steps': array shape (48,)
+ - 'intrinsic_modules/icm/forward_loss': array shape (239,)
+ - 'intrinsic_modules/icm/inverse_loss': array shape (239,)
+ - 'intrinsic_modules/icm/loss': array shape (239,)
+ - 'intrinsic_modules/rnd/predictor_loss': array shape (239,)
+ - 'ppo/actor_loss': array shape (239,)
+ - 'ppo/approx_kl': array shape (239,)
+ - 'ppo/entropy': array shape (239,)
+ - 'ppo/total_loss': array shape (239,)
+ - 'ppo/value_loss': array shape (239, 3)
+ - 'preproc/adv_norm_mean': array shape (239, 3)
+ - 'preproc/adv_norm_std': array shape (239, 3)
+ - 'preproc/adv_raw_mean': array shape (239, 3)
+ - 'preproc/weighted_adv_mean': array shape (239,)
+ - 'preproc/weighted_adv_std': array shape (239,)
+ - 'run/batch_idx': array shape (239,)
+ - 'run/total_env_steps': array shape (239,)
+ - 'time/cumulative_wall_clock_sec': array shape (239,)
+ - 'time/env_steps_per_sec': array shape (239,)
+"""
+
 import os
 import re
 from pathlib import Path
@@ -87,48 +128,73 @@ def load_local_orbax_data(base_dir, achievement):
                     if run_type == "baseline":
                         # Average across Alphas (1), Envs (256), and Episodes (1)
                         returns_array = np.mean(raw_returns, axis=(1, 2, 3))
+
+                        min_len = min(len(steps_array), len(returns_array))
+                        history = pd.DataFrame(
+                            {
+                                "eval/total_steps": steps_array[:min_len],
+                                "standardized_return_mean": returns_array[:min_len],
+                            }
+                        )
+
+                        history = history.dropna(subset=["eval/total_steps", "standardized_return_mean"])
+
+                        if history.empty:
+                            print(f"  -> Warning: Metric arrays were empty after cleaning.")
+                            continue
+
+                        final_performance = history["standardized_return_mean"].iloc[-1]
+
+                        data.append(
+                            {
+                                "run_id": f"{run_type}_{weights_dir.name}_{seed_dir.name}",
+                                "run_type": run_type,
+                                "icm_weight": icm_weight,
+                                "rnd_weight": rnd_weight,
+                                "extrinsic_weight": round(1.0 - icm_weight - rnd_weight, 2),
+                                "seed": seed,
+                                "final_performance": final_performance,
+                                "history": history,
+                            }
+                        )
                     else:
-                        # For curriculum, we must find which index represents the extrinsic-only alpha
+                        # For curriculum, run provides results for multiple alphas
                         alphas = np.asarray(metrics.get("eval/alphas", [[1.0, 0.0, 0.0]]))
-                        target_alpha = np.array([1.0, 0.0, 0.0])
+                        for alpha_idx, alpha_vals in enumerate(alphas):
+                            cur_icm_weight = round(float(alpha_vals[1]), 3)
+                            cur_rnd_weight = round(float(alpha_vals[2]), 3)
+                            cur_ext_weight = round(float(alpha_vals[0]), 3)
 
-                        # Find the index where the alpha matches our target
-                        matches = np.all(np.isclose(alphas, target_alpha), axis=-1)
-                        if np.any(matches):
-                            alpha_idx = np.argmax(matches)
-                        else:
-                            print(f"  -> Warning: Extrinsic-only alpha not found in eval/alphas. Defaulting to 0.")
-                            alpha_idx = 0
+                            # Average only across Envs and Episodes for the specific alpha
+                            returns_array = np.mean(raw_returns[:, alpha_idx, :, :], axis=(1, 2))
 
-                        # Average only across Envs and Episodes for the specific alpha
-                        returns_array = np.mean(raw_returns[:, alpha_idx, :, :], axis=(1, 2))
+                            min_len = min(len(steps_array), len(returns_array))
+                            history = pd.DataFrame(
+                                {
+                                    "eval/total_steps": steps_array[:min_len],
+                                    "standardized_return_mean": returns_array[:min_len],
+                                }
+                            )
 
-                    # 3. Build safe DataFrame
-                    min_len = min(len(steps_array), len(returns_array))
-                    history = pd.DataFrame(
-                        {"eval/total_steps": steps_array[:min_len], "standardized_return_mean": returns_array[:min_len]}
-                    )
+                            history = history.dropna(subset=["eval/total_steps", "standardized_return_mean"])
 
-                    history = history.dropna(subset=["eval/total_steps", "standardized_return_mean"])
+                            if history.empty:
+                                continue
 
-                    if history.empty:
-                        print(f"  -> Warning: Metric arrays were empty after cleaning.")
-                        continue
+                            final_performance = history["standardized_return_mean"].iloc[-1]
 
-                    final_performance = history["standardized_return_mean"].iloc[-1]
-
-                    data.append(
-                        {
-                            "run_id": f"{run_type}_{weights_dir.name}_{seed_dir.name}",
-                            "run_type": run_type,
-                            "icm_weight": icm_weight,
-                            "rnd_weight": rnd_weight,
-                            "extrinsic_weight": round(1.0 - icm_weight - rnd_weight, 2),
-                            "seed": seed,
-                            "final_performance": final_performance,
-                            "history": history,
-                        }
-                    )
+                            data.append(
+                                {
+                                    "run_id": f"{run_type}_{weights_dir.name}_{seed_dir.name}_alpha{alpha_idx}",
+                                    "run_type": run_type,
+                                    "icm_weight": cur_icm_weight,
+                                    "rnd_weight": cur_rnd_weight,
+                                    "extrinsic_weight": cur_ext_weight,
+                                    "seed": seed,
+                                    "final_performance": final_performance,
+                                    "history": history,
+                                }
+                            )
 
                 except Exception as e:
                     print(f"  -> Failed to load {checkpoint_path}: {e}")
@@ -156,7 +222,7 @@ if __name__ == "__main__":
     # import orbax.checkpoint as ocp
 
     # # Pointing exactly to the run that failed
-    # path = "/cs/student/msc/ml/2025/parinofe/open-endedness-project/artifacts/training_results/place_furnace+make_iron_pickaxe/baseline/icm0+rnd0p25/seed3"
+    # path = "/cs/student/msc/ml/2025/parinofe/open-endedness-project/artifacts/training_results/place_furnace+make_iron_pickaxe/curriculum/icm+rnd/seed1"
 
     # checkpointer = ocp.PyTreeCheckpointer()
     # data = checkpointer.restore(os.path.abspath(path))
