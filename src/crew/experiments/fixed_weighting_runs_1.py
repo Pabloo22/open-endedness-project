@@ -32,7 +32,7 @@ NUM_FIXED_WEIGHTINGS = 3
 FIXED_WEIGHTING_SELECTION_SEED = 36900
 
 # Set this from 0, 1, or 2 depending on the GPU you are running on.
-WORKER_INDEX = 2
+WORKER_INDEX = 1
 RUN_EXTRINSIC_ONLY_BASELINE = False
 
 
