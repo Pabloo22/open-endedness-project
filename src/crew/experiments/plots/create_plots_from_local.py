@@ -45,7 +45,13 @@ from pathlib import Path
 import pandas as pd
 import numpy as np
 import orbax.checkpoint as ocp
-from crew.experiments.plots.plot_functions import plot_1_heatmaps, plot_2_learning_curves
+from crew.experiments.plots.plot_functions import (
+    plot_1_heatmaps,
+    plot_2_learning_curves,
+    plot_3_curriculum_adaptation,
+    plot_5_heatmaps,
+    plot_6_learning_curves,
+)
 
 # ==========================================
 # CONFIGURATION
@@ -124,18 +130,34 @@ def load_local_orbax_data(base_dir, achievement):
                     steps_array = np.asarray(metrics["eval/total_steps"])
                     raw_returns = np.asarray(metrics["eval/returns"])  # Shape: (T, Alphas, Envs, Episodes)
 
+                    # Also fetch achievements if available
+                    raw_achs = None
+                    if "eval/achievements" in metrics:
+                        raw_achs = np.asarray(metrics["eval/achievements"])
+
                     # 2. Process the 4D returns array into a 1D array of means
                     if run_type == "baseline":
                         # Average across Alphas (1), Envs (256), and Episodes (1)
                         returns_array = np.mean(raw_returns, axis=(1, 2, 3))
 
-                        min_len = min(len(steps_array), len(returns_array))
-                        history = pd.DataFrame(
-                            {
-                                "eval/total_steps": steps_array[:min_len],
-                                "standardized_return_mean": returns_array[:min_len],
-                            }
-                        )
+                        hist_dict = {
+                            "eval/total_steps": steps_array,
+                            "standardized_return_mean": returns_array,
+                        }
+
+                        final_achievements = np.nan
+                        if raw_achs is not None:
+                            # sum over achievements (axis=-1), then avg over alphas, envs, episodes
+                            achs_array = np.mean(np.sum(raw_achs, axis=-1), axis=(1, 2, 3))
+                            hist_dict["achievements_mean"] = achs_array
+                            final_achievements = achs_array[-1]
+
+                        # find min len across all arrays to handle mismatch
+                        min_len = min(len(v) for v in hist_dict.values())
+
+                        hist_dict = {k: v[:min_len] for k, v in hist_dict.items()}
+
+                        history = pd.DataFrame(hist_dict)
 
                         history = history.dropna(subset=["eval/total_steps", "standardized_return_mean"])
 
@@ -154,10 +176,26 @@ def load_local_orbax_data(base_dir, achievement):
                                 "extrinsic_weight": round(1.0 - icm_weight - rnd_weight, 2),
                                 "seed": seed,
                                 "final_performance": final_performance,
+                                "final_achievements": final_achievements,
                                 "history": history,
                             }
                         )
                     else:
+                        # Extract alpha history for plot 3
+                        alpha_history = pd.DataFrame()
+                        if "curriculum/alpha/mean_per_reward_function" in metrics and "run/total_env_steps" in metrics:
+                            alpha_means = np.asarray(metrics["curriculum/alpha/mean_per_reward_function"])
+                            run_steps = np.asarray(metrics["run/total_env_steps"])
+                            min_len_alpha = min(len(run_steps), len(alpha_means))
+                            alpha_history = pd.DataFrame(
+                                {
+                                    "run/total_env_steps": run_steps[:min_len_alpha],
+                                    "alpha_ext": alpha_means[:min_len_alpha, 0],
+                                    "alpha_icm": alpha_means[:min_len_alpha, 1],
+                                    "alpha_rnd": alpha_means[:min_len_alpha, 2],
+                                }
+                            )
+
                         # For curriculum, run provides results for multiple alphas
                         alphas = np.asarray(metrics.get("eval/alphas", [[1.0, 0.0, 0.0]]))
                         for alpha_idx, alpha_vals in enumerate(alphas):
@@ -168,13 +206,22 @@ def load_local_orbax_data(base_dir, achievement):
                             # Average only across Envs and Episodes for the specific alpha
                             returns_array = np.mean(raw_returns[:, alpha_idx, :, :], axis=(1, 2))
 
-                            min_len = min(len(steps_array), len(returns_array))
-                            history = pd.DataFrame(
-                                {
-                                    "eval/total_steps": steps_array[:min_len],
-                                    "standardized_return_mean": returns_array[:min_len],
-                                }
-                            )
+                            hist_dict = {
+                                "eval/total_steps": steps_array,
+                                "standardized_return_mean": returns_array,
+                            }
+
+                            final_achievements = np.nan
+                            if raw_achs is not None:
+                                # sum over achievements (axis=-1), then avg over envs (axis=1), episodes (axis=2)
+                                achs_array = np.mean(np.sum(raw_achs[:, alpha_idx, :, :], axis=-1), axis=(1, 2))
+                                hist_dict["achievements_mean"] = achs_array
+                                final_achievements = achs_array[-1]
+
+                            min_len = min(len(v) for v in hist_dict.values())
+                            hist_dict = {k: v[:min_len] for k, v in hist_dict.items()}
+
+                            history = pd.DataFrame(hist_dict)
 
                             history = history.dropna(subset=["eval/total_steps", "standardized_return_mean"])
 
@@ -192,7 +239,9 @@ def load_local_orbax_data(base_dir, achievement):
                                     "extrinsic_weight": cur_ext_weight,
                                     "seed": seed,
                                     "final_performance": final_performance,
+                                    "final_achievements": final_achievements,
                                     "history": history,
+                                    "alpha_history": alpha_history,
                                 }
                             )
 
@@ -215,6 +264,14 @@ if __name__ == "__main__":
         # 2. You can now pass this `df` directly to the plotting functions from the previous script!
         plot_1_heatmaps(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
         plot_2_learning_curves(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
+        plot_3_curriculum_adaptation(
+            df,
+            "images",
+            achievement_filter=ACHIEVEMENT_FILTER,
+            include_baseline_performance=True,
+        )
+        plot_5_heatmaps(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
+        plot_6_learning_curves(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
 
     else:
         print("No valid local data found.")
