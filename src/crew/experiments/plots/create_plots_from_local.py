@@ -59,6 +59,7 @@ from crew.experiments.plots.plot_functions import (
 # CONFIGURATION
 # ==========================================
 ARTIFACTS_DIR = "artifacts/training_results"
+FILTERED_RESULTS_DIR = "artifacts/filtered_results"
 ACHIEVEMENT_FILTER = "defeat_skeleton+make_stone_pickaxe"
 
 
@@ -253,12 +254,61 @@ def load_local_orbax_data(base_dir, achievement):
     return pd.DataFrame(data)
 
 
+def load_filtered_results(base_dir, achievement):
+    """Load compact exported data from artifacts/filtered_results."""
+    target_dir = Path(base_dir) / achievement
+    metadata_path = target_dir / "runs_metadata.csv"
+
+    if not metadata_path.exists():
+        print(f"Filtered metadata not found at {metadata_path}")
+        return pd.DataFrame()
+
+    metadata_df = pd.read_csv(metadata_path)
+    if metadata_df.empty:
+        return pd.DataFrame()
+
+    rows = []
+    for _, row in metadata_df.iterrows():
+        history = pd.DataFrame()
+        history_rel = str(row.get("history_file", ""))
+        if history_rel:
+            history_path = target_dir / history_rel
+            if history_path.exists():
+                history = pd.read_csv(history_path)
+
+        alpha_history = pd.DataFrame()
+        alpha_history_rel = str(row.get("alpha_history_file", ""))
+        if alpha_history_rel:
+            alpha_history_path = target_dir / alpha_history_rel
+            if alpha_history_path.exists():
+                alpha_history = pd.read_csv(alpha_history_path)
+
+        rows.append(
+            {
+                "run_id": row["run_id"],
+                "run_type": row["run_type"],
+                "icm_weight": float(row["icm_weight"]),
+                "rnd_weight": float(row["rnd_weight"]),
+                "extrinsic_weight": float(row["extrinsic_weight"]),
+                "seed": int(row["seed"]),
+                "final_performance": float(row["final_performance"]),
+                "final_achievements": float(row["final_achievements"]),
+                "history": history,
+                "alpha_history": alpha_history,
+            }
+        )
+
+    return pd.DataFrame(rows)
+
+
 # ==========================================
 # MAIN EXECUTION
 # ==========================================
 if __name__ == "__main__":
-    # 1. Fetch data locally instead of from W&B
-    df = load_local_orbax_data(ARTIFACTS_DIR, ACHIEVEMENT_FILTER)
+    # 1. Prefer compact exported data when available; otherwise fallback to full checkpoints.
+    df = load_filtered_results(FILTERED_RESULTS_DIR, ACHIEVEMENT_FILTER)
+    if df.empty:
+        df = load_local_orbax_data(ARTIFACTS_DIR, ACHIEVEMENT_FILTER)
 
     if not df.empty:
         print(f"\nSuccessfully loaded {len(df)} local runs. Ready to plot!")
