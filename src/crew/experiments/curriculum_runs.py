@@ -18,8 +18,8 @@ ENV_ID = "Craftax-Classic-Symbolic-v1"
 
 # Keep these as Craftax Classic `Achievement` enum members.
 EXTRINSIC_ACHIEVEMENTS = (
-    Achievement.DEFEAT_SKELETON,
-    Achievement.MAKE_STONE_PICKAXE,
+    Achievement.PLACE_FURNACE,
+    Achievement.MAKE_IRON_PICKAXE,
 )
 
 # Choose from the registered intrinsic module names. Two are sampled once and reused for every seed.
@@ -68,6 +68,7 @@ def main() -> None:
             eval_every_n_batches=5,
             eval_num_envs=32,
             eval_num_episodes=8,
+            total_timesteps=1_000_000_000,
         )
         print(f"Starting curriculum run for train_seed={train_seed}")
         run_main_algo_training(config=config, save_results=SAVE_RESULTS)
