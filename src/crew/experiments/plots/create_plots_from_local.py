@@ -42,9 +42,11 @@ Available keys in 'metrics' for the currriculum run:
 import os
 import re
 from pathlib import Path
-import pandas as pd
+
 import numpy as np
 import orbax.checkpoint as ocp
+import pandas as pd
+
 from crew.experiments.plots.plot_functions import (
     plot_1_heatmaps,
     plot_2_learning_curves,
@@ -57,7 +59,7 @@ from crew.experiments.plots.plot_functions import (
 # CONFIGURATION
 # ==========================================
 ARTIFACTS_DIR = "artifacts/training_results"
-ACHIEVEMENT_FILTER = "place_furnace+make_iron_pickaxe"
+ACHIEVEMENT_FILTER = "defeat_skeleton+make_stone_pickaxe"
 
 
 # ==========================================
