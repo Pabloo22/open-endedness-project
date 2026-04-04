@@ -609,3 +609,135 @@ def plot_3_curriculum_adaptation(
         print(f"Saved Plot 3 Performance to {save_path_perf}")
 
     plt.show()
+
+
+def plot_4_contour_overlay(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe", grid_size=8):
+    plt.style.use("ggplot")
+    import io
+    import imageio
+    
+    step = 1.0 / grid_size
+    grid_indices = np.round(np.arange(0, 0.875 + step / 2, step), 3)
+    grid_dim = len(grid_indices)
+
+    max_score = len(achievement_filter.split("+")) if achievement_filter else 1.0
+    metric_col = "standardized_return_mean"
+    
+    curr_eval_df = df[df["run_type"] == "curriculum"]
+    curr_df = df[(df["run_type"] == "curriculum") & (df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0)]
+
+    max_eval_steps = 0
+    if not curr_eval_df.empty:
+        for _, row in curr_eval_df.iterrows():
+            hist = row.get("history")
+            if hist is not None and not hist.empty and "eval/total_steps" in hist.columns:
+                max_eval_steps = max(max_eval_steps, hist["eval/total_steps"].max())
+                
+    if max_eval_steps == 0:
+        print("Warning: No evaluation steps found for plot 4.")
+        return
+        
+    percentages = np.linspace(0.0, 1.0, 21) # 0%, 5%, ..., 100%
+    pdf_pcts = [0.25, 0.50, 0.75, 1.00]
+    
+    gif_frames = []
+    
+    for pct in percentages:
+        target_step = max_eval_steps * pct
+        
+        grid_perf = np.full((grid_dim, grid_dim), np.nan)
+        mask_invalid = np.zeros((grid_dim, grid_dim), dtype=bool)
+        
+        for i, icm in enumerate(grid_indices):
+            for j, rnd in enumerate(grid_indices):
+                if round(icm + rnd, 3) > 0.9:
+                    mask_invalid[i, j] = True
+                else:
+                    match = curr_eval_df[
+                        (np.isclose(curr_eval_df["icm_weight"], icm, atol=1e-3))
+                        & (np.isclose(curr_eval_df["rnd_weight"], rnd, atol=1e-3))
+                    ]
+                    if not match.empty:
+                        seed_perfs = []
+                        for _, row in match.iterrows():
+                            hist = row.get("history")
+                            if hist is not None and not hist.empty and metric_col in hist.columns:
+                                valid_hists = hist[hist["eval/total_steps"] <= target_step]
+                                if not valid_hists.empty:
+                                    val = valid_hists.iloc[-1][metric_col]
+                                    seed_perfs.append(val)
+                        if seed_perfs:
+                            grid_perf[i, j] = np.mean(seed_perfs)
+
+        grid_freq = np.zeros((grid_dim, grid_dim))
+        
+        all_alpha_histories = []
+        for _, row in curr_df.iterrows():
+            alpha_hist = row.get("alpha_history")
+            if alpha_hist is not None and not alpha_hist.empty and "run/total_env_steps" in alpha_hist.columns:
+                valid_alpha = alpha_hist[alpha_hist["run/total_env_steps"] <= target_step]
+                all_alpha_histories.append(valid_alpha)
+                
+        if all_alpha_histories:
+            combined_alpha = pd.concat(all_alpha_histories)
+            icm_vals = combined_alpha["alpha_icm"].values
+            rnd_vals = combined_alpha["alpha_rnd"].values
+            
+            for icm_val, rnd_val in zip(icm_vals, rnd_vals):
+                i_idx = np.abs(grid_indices - icm_val).argmin()
+                j_idx = np.abs(grid_indices - rnd_val).argmin()
+                grid_freq[i_idx, j_idx] += 1
+                
+            max_freq = grid_freq.max()
+            if max_freq > 0:
+                grid_freq = grid_freq / max_freq
+
+        fig, ax = plt.subplots(figsize=(8, 6))
+        
+        X, Y = np.meshgrid(grid_indices, grid_indices)
+        
+        cmap = sns.color_palette("viridis", as_cmap=True)
+        cmap.set_bad("white")
+        
+        masked_perf = np.ma.masked_array(grid_perf, mask=mask_invalid)
+        heatmap = ax.pcolormesh(X, Y, masked_perf, cmap=cmap, vmin=0, vmax=max_score, shading="nearest")
+        cbar = fig.colorbar(heatmap, ax=ax, label="Mean Return")
+        
+        mask_color = np.ma.masked_array(np.zeros_like(grid_perf), mask=~mask_invalid)
+        ax.pcolormesh(X, Y, mask_color, cmap=ListedColormap(["black"]), shading="nearest")
+
+        contour_levels = np.linspace(0.1, 0.9, 5)
+        if len(np.unique(grid_freq)) > 1:
+            contours = ax.contour(X, Y, grid_freq, levels=contour_levels, colors="darkred", linewidths=2, alpha=0.9)
+            ax.clabel(contours, inline=True, fontsize=10, fmt="%.1f")
+        
+        ax.set_title(f"CuReMix Condition Overlay at {int(pct*100)}% Training")
+        ax.set_xlabel("RND Weight")
+        ax.set_ylabel("ICM Weight")
+        ax.set_xticks(grid_indices)
+        ax.set_yticks(grid_indices)
+        
+        ax.grid(color="white", linestyle=":", alpha=0.3)
+        plt.tight_layout()
+        
+        # Save frame to buffer for GIF
+        buf = io.BytesIO()
+        plt.savefig(buf, format='png', bbox_inches='tight')
+        buf.seek(0)
+        gif_frames.append(imageio.v2.imread(buf))
+        
+        # If this is a pdf target, save to file
+        for target_pct in pdf_pcts:
+            if np.isclose(pct, target_pct):
+                filename = f"plot_4_contour_{int(pct*100)}pct_{achievement_filter}.pdf"
+                save_path = os.path.join(save_dir, filename)
+                plt.savefig(save_path, format="pdf", bbox_inches="tight")
+                print(f"Saved {filename} to {save_path}")
+                break
+                
+        plt.close(fig)
+
+    gif_filename = f"plot_4_contour_timelapse_{achievement_filter}.gif"
+    gif_save_path = os.path.join(save_dir, gif_filename)
+    imageio.mimsave(gif_save_path, gif_frames, fps=2, duration=500) # 2 fps
+    print(f"Saved GIF to {gif_save_path}")

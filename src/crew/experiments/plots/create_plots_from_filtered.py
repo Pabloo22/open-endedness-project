@@ -9,6 +9,7 @@ from crew.experiments.plots.plot_functions import (
     plot_2_learning_curves,
     plot_2_b_learning_curves,
     plot_3_curriculum_adaptation,
+    plot_4_contour_overlay,
     plot_5_heatmaps,
     plot_6_learning_curves,
 )
@@ -70,9 +71,9 @@ if __name__ == "__main__":
             achievement_filter=selected_achievement,
             include_baseline_performance=True,
         )
+        plot_4_contour_overlay(df, str(achievement_images_dir), achievement_filter=selected_achievement)
         plot_5_heatmaps(df, str(achievement_images_dir), achievement_filter=selected_achievement)
         plot_6_learning_curves(df, str(achievement_images_dir), achievement_filter=selected_achievement)
-
 
         plt.close("all")
 
