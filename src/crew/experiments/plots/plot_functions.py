@@ -4,6 +4,17 @@ import seaborn as sns
 import pandas as pd
 import numpy as np
 from matplotlib.colors import ListedColormap
+from adjustText import adjust_text
+
+
+# Opacity used for uncertainty/shaded regions in line plots.
+SHADED_REGION_ALPHA = 0.10
+
+# Z value for two-sided 95% confidence intervals.
+CI_95_Z = 1.96
+
+# Figure size used for line plots
+LINE_PLOT_FIGSIZE = (9, 6)
 
 
 def _plot_heatmaps_base(
@@ -127,7 +138,7 @@ def plot_5_heatmaps(df, save_dir, achievement_filter="place_furnace+make_iron_pi
 
 def _plot_learning_curves_base(df, save_dir, achievement_filter, metric_col, prefix, ylabel):
     plt.style.use("ggplot")
-    plt.figure(figsize=(10, 6))
+    fig, ax = plt.subplots(figsize=LINE_PLOT_FIGSIZE)
 
     # we use the metric_col for everything instead of standardized_return_mean and final_performance
     final_metric_col = "final_performance" if metric_col == "standardized_return_mean" else "final_achievements"
@@ -206,35 +217,73 @@ def _plot_learning_curves_base(df, save_dir, achievement_filter, metric_col, pre
 
     def plot_curve(subset_df, label, color):
         if subset_df is None or subset_df.empty:
-            return
+            return 0
 
         histories = pd.concat(subset_df["history"].tolist())
         histories["eval/total_steps"] = histories["eval/total_steps"].round(decimals=-4)
         stats = histories.groupby("eval/total_steps")[metric_col].agg(["mean", "min", "max"]).reset_index()
 
-        plt.plot(stats["eval/total_steps"], stats["mean"], label=label, color=color)
-        plt.fill_between(
+        ax.plot(stats["eval/total_steps"], stats["mean"], label=label, color=color)
+        ax.fill_between(
             stats["eval/total_steps"],
             stats["min"],
             stats["max"],
             color=color,
-            alpha=0.2,
+            alpha=SHADED_REGION_ALPHA,
         )
 
-    plot_curve(ext_only_df, "Extrinsic Only", "#56B4E9")
+        last_x = stats["eval/total_steps"].iloc[-1]
+        last_y = stats["mean"].iloc[-1]
+        t = ax.text(
+            last_x,
+            last_y,
+            f"  {label}",
+            color=color,
+            va="center",
+            ha="left",
+            multialignment="left",
+            fontweight="bold",
+            clip_on=False,
+        )
+        texts_list.append(t)
+        return stats["eval/total_steps"].max()
+
+    max_steps = 0
+    texts_list = []
+
+    m = plot_curve(ext_only_df, "Extrinsic Only", "#56B4E9")
+    if m:
+        max_steps = max(max_steps, m)
 
     if best_fixed_weights:
-        plot_curve(
-            best_fixed_df, f"Best Fixed Weights (ICM={best_fixed_weights[0]}, RND={best_fixed_weights[1]})", "#E69F00"
+        m = plot_curve(
+            best_fixed_df, f"Best Fixed Weights\n(ICM={best_fixed_weights[0]}, RND={best_fixed_weights[1]})", "#E69F00"
         )
+        if m:
+            max_steps = max(max_steps, m)
 
     if not best_curr_df.empty:
-        plot_curve(best_curr_df, "Curriculum Method (Ours)", "#009E73")
+        m = plot_curve(best_curr_df, "CuReMix (Ours)", "#009E73")
+        if m:
+            max_steps = max(max_steps, m)
 
-    plt.xlabel("Total Environment Steps")
-    plt.ylabel(ylabel)
-    plt.legend()
-    plt.grid(True, alpha=0.3)
+    ax.set_xlabel("Total Environment Steps")
+    ax.set_ylabel(ylabel)
+    if max_steps > 0:
+        ax.set_xlim(0, max_steps)
+    ax.grid(True, alpha=0.3)
+
+    if texts_list:
+        # Ensure accurate multiline text extents before adjustText computes overlaps.
+        fig.canvas.draw()
+        adjust_text(
+            texts_list,
+            ax=ax,
+            only_move={"text": "y"},
+            ensure_inside_axes=False,
+            expand=(1.01, 1.2),
+            force_text=(0.1, 2.0),
+        )
 
     # Save the figure as a PDF
     save_path = os.path.join(save_dir, f"{prefix}_learning_curves_{achievement_filter}.pdf")
@@ -255,6 +304,167 @@ def plot_2_learning_curves(df, save_dir, achievement_filter="place_furnace+make_
     )
 
 
+def plot_2_b_learning_curves(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe"):
+    plt.style.use("ggplot")
+    fig, ax = plt.subplots(figsize=LINE_PLOT_FIGSIZE)
+
+    metric_col = "standardized_return_mean"
+    final_metric_col = "final_performance"
+    prefix = "plot_2_b"
+    ylabel = "Extrinsic Return (Mean)"
+
+    # Compute mean final performance for each configuration
+    fixed_search_df = df[(df["run_type"] == "baseline") & ~((df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0))]
+
+    max_score = len(achievement_filter.split("+")) if achievement_filter else 1.0
+
+    max_steps = 0
+    texts_list = []
+
+    if not fixed_search_df.empty:
+        mean_perfs = fixed_search_df.groupby(["icm_weight", "rnd_weight"])[final_metric_col].mean().reset_index()
+        mean_perfs = mean_perfs.sort_values(by=final_metric_col, ascending=False).reset_index(drop=True)
+
+        # Split into 5 quintiles safely
+        indices_list = np.array_split(np.arange(len(mean_perfs)), 5)
+        quintiles = [mean_perfs.iloc[indices] for indices in indices_list if len(indices) > 0]
+
+        colors = sns.color_palette("rocket", 5)
+        labels = [
+            "Top 0-20%\nFixed Alphas",
+            "Top 20-40%\nFixed Alphas",
+            "Top 40-60%\nFixed Alphas",
+            "Top 60-80%\nFixed Alphas",
+            "Top 80-100%\nFixed Alphas",
+        ]
+
+        for q_idx, quintile_df in enumerate(quintiles):
+            if quintile_df.empty:
+                continue
+
+            q_histories = []
+            for _, row in quintile_df.iterrows():
+                icm, rnd = row["icm_weight"], row["rnd_weight"]
+                cand_df = fixed_search_df[
+                    (fixed_search_df["icm_weight"] == icm) & (fixed_search_df["rnd_weight"] == rnd)
+                ]
+                q_histories.extend(cand_df["history"].tolist())
+
+            if q_histories:
+                histories = pd.concat(q_histories)
+                if metric_col in histories.columns:
+                    histories["eval/total_steps"] = histories["eval/total_steps"].round(decimals=-4)
+                    stats = (
+                        histories.groupby("eval/total_steps")[metric_col]
+                        .agg(mean="mean", std=lambda x: x.std(ddof=0), count="count")
+                        .reset_index()
+                    )
+
+                    sem = stats["std"] / np.sqrt(stats["count"].clip(lower=1))
+                    ci_half_width = CI_95_Z * sem
+                    lower_bound = np.maximum(stats["mean"] - ci_half_width, 0)
+                    upper_bound = np.minimum(stats["mean"] + ci_half_width, max_score)
+
+                    ax.plot(stats["eval/total_steps"], stats["mean"], label=labels[q_idx], color=colors[q_idx])
+                    ax.fill_between(
+                        stats["eval/total_steps"],
+                        lower_bound,
+                        upper_bound,
+                        color=colors[q_idx],
+                        alpha=SHADED_REGION_ALPHA,
+                    )
+
+                    last_x = stats["eval/total_steps"].iloc[-1]
+                    last_y = stats["mean"].iloc[-1]
+                    t = ax.text(
+                        last_x,
+                        last_y,
+                        f"  {labels[q_idx]}",
+                        color=colors[q_idx],
+                        va="center",
+                        ha="left",
+                        multialignment="left",
+                        fontweight="bold",
+                        clip_on=False,
+                    )
+                    texts_list.append(t)
+                    max_steps = max(max_steps, last_x)
+    # CuReMix
+    curr_search_df = df[df["run_type"] == "curriculum"]
+    if not curr_search_df.empty:
+        all_curr_histories = []
+        for _, row in curr_search_df.iterrows():
+            hist = row["history"].copy()
+            if metric_col not in hist.columns:
+                continue
+            hist["seed"] = row["seed"]
+            hist["alpha_id"] = f"{row['icm_weight']}_{row['rnd_weight']}"
+            all_curr_histories.append(hist)
+
+        if all_curr_histories:
+            curr_histories_df = pd.concat(all_curr_histories)
+
+            best_per_step_seed = curr_histories_df.groupby(["eval/total_steps", "seed"])[metric_col].max().reset_index()
+
+            best_curr_run_data = []
+            for seed in best_per_step_seed["seed"].unique():
+                seed_hist = best_per_step_seed[best_per_step_seed["seed"] == seed][["eval/total_steps", metric_col]]
+                best_curr_run_data.append(seed_hist)
+
+            if best_curr_run_data:
+                histories = pd.concat(best_curr_run_data)
+                histories["eval/total_steps"] = histories["eval/total_steps"].round(decimals=-4)
+                stats = histories.groupby("eval/total_steps")[metric_col].agg(["mean", "min", "max"]).reset_index()
+
+                ax.plot(stats["eval/total_steps"], stats["mean"], label="CuReMix (Ours)", color="#009E73")
+                ax.fill_between(
+                    stats["eval/total_steps"],
+                    stats["min"],
+                    stats["max"],
+                    color="#009E73",
+                    alpha=SHADED_REGION_ALPHA,
+                )
+                last_x = stats["eval/total_steps"].iloc[-1]
+                last_y = stats["mean"].iloc[-1]
+                t = ax.text(
+                    last_x,
+                    last_y,
+                    "  CuReMix (Ours)",
+                    color="#009E73",
+                    va="center",
+                    ha="left",
+                    multialignment="left",
+                    fontweight="bold",
+                    clip_on=False,
+                )
+                texts_list.append(t)
+                max_steps = max(max_steps, last_x)
+
+    ax.set_xlabel("Total Environment Steps")
+    ax.set_ylabel(ylabel)
+    if max_steps > 0:
+        ax.set_xlim(0, max_steps)
+    ax.grid(True, alpha=0.3)
+
+    if texts_list:
+        # Force renderer update so multiline labels have correct bounding boxes.
+        fig.canvas.draw()
+        adjust_text(
+            texts_list,
+            ax=ax,
+            only_move={"text": "y"},
+            ensure_inside_axes=False,
+            expand=(1.01, 1.2),
+            force_text=(0.1, 2.0),
+        )
+
+    save_path = os.path.join(save_dir, f"{prefix}_learning_curves_{achievement_filter}.pdf")
+    plt.savefig(save_path, format="pdf", bbox_inches="tight")
+    print(f"Saved {prefix.replace('_', ' ').title()} to {save_path}")
+
+    plt.show()
+
+
 def plot_6_learning_curves(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe"):
     _plot_learning_curves_base(
         df,
@@ -270,7 +480,7 @@ def plot_3_curriculum_adaptation(
     df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe", include_baseline_performance=False
 ):
     plt.style.use("ggplot")
-    fig, ax1 = plt.subplots(figsize=(10, 6))
+    fig, ax1 = plt.subplots(figsize=LINE_PLOT_FIGSIZE)
 
     curr_df = df[(df["run_type"] == "curriculum") & (df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0)]
 
@@ -301,34 +511,60 @@ def plot_3_curriculum_adaptation(
 
     # Make plots for each alpha
     steps = stats["run/total_env_steps"].values
+    texts_list1 = []
 
     # Extrinsic
     ext_mean = stats["alpha_ext"]["mean"].values
     ext_min = stats["alpha_ext"]["min"].values
     ext_max = stats["alpha_ext"]["max"].values
     ax1.plot(steps, ext_mean, label="Extrinsic", color="#56B4E9")
-    ax1.fill_between(steps, ext_min, ext_max, color="#56B4E9", alpha=0.2)
+    ax1.fill_between(steps, ext_min, ext_max, color="#56B4E9", alpha=SHADED_REGION_ALPHA)
+    texts_list1.append(
+        ax1.text(
+            steps[-1],
+            ext_mean[-1],
+            "  Extrinsic",
+            color="#56B4E9",
+            va="center",
+            ha="left",
+            fontweight="bold",
+            clip_on=False,
+        )
+    )
 
     # ICM
     icm_mean = stats["alpha_icm"]["mean"].values
     icm_min = stats["alpha_icm"]["min"].values
     icm_max = stats["alpha_icm"]["max"].values
     ax1.plot(steps, icm_mean, label="ICM", color="#E69F00")
-    ax1.fill_between(steps, icm_min, icm_max, color="#E69F00", alpha=0.2)
+    ax1.fill_between(steps, icm_min, icm_max, color="#E69F00", alpha=SHADED_REGION_ALPHA)
+    texts_list1.append(
+        ax1.text(
+            steps[-1], icm_mean[-1], "  ICM", color="#E69F00", va="center", ha="left", fontweight="bold", clip_on=False
+        )
+    )
 
     # RND
     rnd_mean = stats["alpha_rnd"]["mean"].values
     rnd_min = stats["alpha_rnd"]["min"].values
     rnd_max = stats["alpha_rnd"]["max"].values
     ax1.plot(steps, rnd_mean, label="RND", color="#009E73")
-    ax1.fill_between(steps, rnd_min, rnd_max, color="#009E73", alpha=0.2)
+    ax1.fill_between(steps, rnd_min, rnd_max, color="#009E73", alpha=SHADED_REGION_ALPHA)
+    texts_list1.append(
+        ax1.text(
+            steps[-1], rnd_mean[-1], "  RND", color="#009E73", va="center", ha="left", fontweight="bold", clip_on=False
+        )
+    )
 
     ax1.set_xlabel("Total Environment Steps")
-    # ax1.set_ylabel("Reward Function Alpha Weight")
+    ax1.set_ylabel("Weight")
     ax1.set_ylim(bottom=0)
-    ax1.legend(title="Alpha Weights", loc="best")
+    if len(steps) > 0:
+        ax1.set_xlim(0, steps[-1])
     ax1.grid(True, alpha=0.3)
-    fig.tight_layout()
+
+    if texts_list1:
+        adjust_text(texts_list1, ax=ax1, only_move={"text": "y"}, ensure_inside_axes=False)
 
     # Save the original figure
     save_path = os.path.join(save_dir, f"plot_3_curriculum_adaptation_{achievement_filter}.pdf")
@@ -337,7 +573,7 @@ def plot_3_curriculum_adaptation(
 
     # Generate the performance plot in a separate figure
     if include_baseline_performance and not curr_df.empty:
-        fig2, ax_perf = plt.subplots(figsize=(10, 6))
+        fig2, ax_perf = plt.subplots(figsize=LINE_PLOT_FIGSIZE)
 
         b_histories = pd.concat(curr_df["history"].tolist())
         b_histories["eval/total_steps"] = b_histories["eval/total_steps"].round(decimals=-4)
@@ -350,17 +586,23 @@ def plot_3_curriculum_adaptation(
         ax_perf.plot(
             b_stats["eval/total_steps"],
             b_stats["mean"],
-            label="Mean Performance",
             color="#CC79A7",
         )
-        ax_perf.fill_between(b_stats["eval/total_steps"], b_stats["min"], b_stats["max"], color="#CC79A7", alpha=0.2)
+        ax_perf.fill_between(
+            b_stats["eval/total_steps"],
+            b_stats["min"],
+            b_stats["max"],
+            color="#CC79A7",
+            alpha=SHADED_REGION_ALPHA,
+        )
+
+        last_x = b_stats["eval/total_steps"].iloc[-1]
 
         ax_perf.set_xlabel("Total Environment Steps")
         ax_perf.set_ylabel("Extrinsic Return (Mean)")
         ax_perf.set_ylim(bottom=0)
-        ax_perf.legend(loc="best")
+        ax_perf.set_xlim(0, last_x)
         ax_perf.grid(True, alpha=0.3)
-        fig2.tight_layout()
 
         save_path_perf = os.path.join(save_dir, f"plot_3_curriculum_adaptation_performance_{achievement_filter}.pdf")
         fig2.savefig(save_path_perf, format="pdf", bbox_inches="tight")

@@ -20,10 +20,11 @@ tqdm = ">=4.67.1"
 numpy = ">=2.2.1"
 wandb = {extras = ["media"], version = "^0.25.1"}
 jax = "^0.9.1"
+matplotlib = "^3.10.8"
+adjusttext = "^1.3.0"
 
 [tool.poetry.group.notebooks.dependencies]
 ipykernel = "^7.2.0"
-matplotlib = "^3.10.8"
 jupyter = "^1.1.1"
 
 [tool.poetry.group.dev.dependencies]
