@@ -56,6 +56,56 @@ plt.rcParams.update(
 )
 
 
+def _add_curve_to_axis(ax, x, y, lower, upper, label, color, use_direct_labels, texts_list):
+    """Helper to plot a curve with an uncertainty band and optional direct labels."""
+    ax.plot(x, y, label=label, color=color)
+    if lower is not None and upper is not None:
+        ax.fill_between(x, lower, upper, color=color, alpha=SHADED_REGION_ALPHA)
+
+    if use_direct_labels and len(x) > 0:
+        last_x = x.iloc[-1] if hasattr(x, "iloc") else x[-1]
+        last_y = y.iloc[-1] if hasattr(y, "iloc") else y[-1]
+        t = ax.text(
+            last_x,
+            last_y,
+            f"  {label}",
+            color=color,
+            va="center",
+            ha="left",
+            multialignment="left",
+            fontweight="bold",
+            clip_on=False,
+            fontsize=LABEL_FONTSIZE,
+        )
+        if texts_list is not None:
+            texts_list.append(t)
+    return x.max() if len(x) > 0 else 0
+
+
+def _get_curemix_stats(curr_search_df, metric_col):
+    """Helper to compute best-per-step max returns across alpha subsets for curriculum runs."""
+    if curr_search_df is None or curr_search_df.empty:
+        return None
+
+    all_curr_histories = []
+    for _, row in curr_search_df.iterrows():
+        hist = row.get("history")
+        if hist is None or hist.empty or metric_col not in hist.columns:
+            continue
+        hist = hist.copy()
+        hist["seed"] = row.get("seed", 0)
+        all_curr_histories.append(hist)
+
+    if not all_curr_histories:
+        return None
+
+    curr_histories_df = pd.concat(all_curr_histories)
+    best_per_step_seed = curr_histories_df.groupby(["eval/total_steps", "seed"])[metric_col].max().reset_index()
+    histories = best_per_step_seed[["eval/total_steps", metric_col]].copy()
+    histories["eval/total_steps"] = histories["eval/total_steps"].round(decimals=-4)
+    return histories.groupby("eval/total_steps")[metric_col].agg(["mean", "min", "max"]).reset_index()
+
+
 def _plot_heatmaps_base(
     df,
     save_dir,
@@ -232,33 +282,8 @@ def _plot_learning_curves_base(df, save_dir, achievement_filter, metric_col, pre
     best_fixed_weights, best_fixed_df = get_best_run(fixed_search_df)
 
     # For curriculum, we pick the best alpha value for each timestep individually for each seed.
-    # With those values (one per seed), the plot_curve function will compute the mean, min, and max.
     curr_search_df = df[df["run_type"] == "curriculum"]
-    best_curr_df = pd.DataFrame()
-    if not curr_search_df.empty:
-        # Explode histories to get all time steps
-        all_curr_histories = []
-        for _, row in curr_search_df.iterrows():
-            hist = row["history"].copy()
-            if metric_col not in hist.columns:
-                continue
-            hist["seed"] = row["seed"]
-            hist["alpha_id"] = f"{row['icm_weight']}_{row['rnd_weight']}"
-            all_curr_histories.append(hist)
-
-        if all_curr_histories:
-            curr_histories_df = pd.concat(all_curr_histories)
-
-            # For each seed and for each timestep, take the maximum return across all alphas
-            best_per_step_seed = curr_histories_df.groupby(["eval/total_steps", "seed"])[metric_col].max().reset_index()
-
-            # Package this back into a format that plot_curve expects (a df with a 'history' column holding dfs)
-            best_curr_run_data = []
-            for seed in best_per_step_seed["seed"].unique():
-                seed_hist = best_per_step_seed[best_per_step_seed["seed"] == seed][["eval/total_steps", metric_col]]
-                best_curr_run_data.append({"history": seed_hist})
-
-            best_curr_df = pd.DataFrame(best_curr_run_data)
+    best_curr_stats = _get_curemix_stats(curr_search_df, metric_col)
 
     def plot_curve(subset_df, label, color):
         if subset_df is None or subset_df.empty:
@@ -268,32 +293,17 @@ def _plot_learning_curves_base(df, save_dir, achievement_filter, metric_col, pre
         histories["eval/total_steps"] = histories["eval/total_steps"].round(decimals=-4)
         stats = histories.groupby("eval/total_steps")[metric_col].agg(["mean", "min", "max"]).reset_index()
 
-        ax.plot(stats["eval/total_steps"], stats["mean"], label=label, color=color)
-        ax.fill_between(
+        return _add_curve_to_axis(
+            ax,
             stats["eval/total_steps"],
+            stats["mean"],
             stats["min"],
             stats["max"],
-            color=color,
-            alpha=SHADED_REGION_ALPHA,
+            label,
+            color,
+            use_direct_labels,
+            texts_list,
         )
-
-        if use_direct_labels:
-            last_x = stats["eval/total_steps"].iloc[-1]
-            last_y = stats["mean"].iloc[-1]
-            t = ax.text(
-                last_x,
-                last_y,
-                f"  {label}",
-                color=color,
-                va="center",
-                ha="left",
-                multialignment="left",
-                fontweight="bold",
-                clip_on=False,
-                fontsize=LABEL_FONTSIZE,
-            )
-            texts_list.append(t)
-        return stats["eval/total_steps"].max()
 
     max_steps = 0
     texts_list = []
@@ -307,8 +317,18 @@ def _plot_learning_curves_base(df, save_dir, achievement_filter, metric_col, pre
         if m:
             max_steps = max(max_steps, m)
 
-    if not best_curr_df.empty:
-        m = plot_curve(best_curr_df, "CuReMix (Ours)", "#009E73")
+    if best_curr_stats is not None and not best_curr_stats.empty:
+        m = _add_curve_to_axis(
+            ax,
+            best_curr_stats["eval/total_steps"],
+            best_curr_stats["mean"],
+            best_curr_stats["min"],
+            best_curr_stats["max"],
+            "CuReMix (Ours)",
+            "#009E73",
+            use_direct_labels,
+            texts_list,
+        )
         if m:
             max_steps = max(max_steps, m)
 
@@ -418,85 +438,35 @@ def plot_2_b_learning_curves(
                     lower_bound = np.maximum(stats["mean"] - ci_half_width, 0)
                     upper_bound = np.minimum(stats["mean"] + ci_half_width, max_score)
 
-                    ax.plot(stats["eval/total_steps"], stats["mean"], label=labels[q_idx], color=colors[q_idx])
-                    ax.fill_between(
+                    last_step = _add_curve_to_axis(
+                        ax,
                         stats["eval/total_steps"],
+                        stats["mean"],
                         lower_bound,
                         upper_bound,
-                        color=colors[q_idx],
-                        alpha=SHADED_REGION_ALPHA,
+                        labels[q_idx],
+                        colors[q_idx],
+                        use_direct_labels,
+                        texts_list,
                     )
-
-                    if use_direct_labels:
-                        last_x = stats["eval/total_steps"].iloc[-1]
-                        last_y = stats["mean"].iloc[-1]
-                        t = ax.text(
-                            last_x,
-                            last_y,
-                            f"  {labels[q_idx]}",
-                            color=colors[q_idx],
-                            va="center",
-                            ha="left",
-                            multialignment="left",
-                            fontweight="bold",
-                            clip_on=False,
-                            fontsize=LABEL_FONTSIZE,
-                        )
-                        texts_list.append(t)
-                    max_steps = max(max_steps, stats["eval/total_steps"].iloc[-1])
+                    max_steps = max(max_steps, last_step)
     # CuReMix
     curr_search_df = df[df["run_type"] == "curriculum"]
-    if not curr_search_df.empty:
-        all_curr_histories = []
-        for _, row in curr_search_df.iterrows():
-            hist = row["history"].copy()
-            if metric_col not in hist.columns:
-                continue
-            hist["seed"] = row["seed"]
-            hist["alpha_id"] = f"{row['icm_weight']}_{row['rnd_weight']}"
-            all_curr_histories.append(hist)
+    best_curr_stats = _get_curemix_stats(curr_search_df, metric_col)
 
-        if all_curr_histories:
-            curr_histories_df = pd.concat(all_curr_histories)
-
-            best_per_step_seed = curr_histories_df.groupby(["eval/total_steps", "seed"])[metric_col].max().reset_index()
-
-            best_curr_run_data = []
-            for seed in best_per_step_seed["seed"].unique():
-                seed_hist = best_per_step_seed[best_per_step_seed["seed"] == seed][["eval/total_steps", metric_col]]
-                best_curr_run_data.append(seed_hist)
-
-            if best_curr_run_data:
-                histories = pd.concat(best_curr_run_data)
-                histories["eval/total_steps"] = histories["eval/total_steps"].round(decimals=-4)
-                stats = histories.groupby("eval/total_steps")[metric_col].agg(["mean", "min", "max"]).reset_index()
-
-                ax.plot(stats["eval/total_steps"], stats["mean"], label="CuReMix (Ours)", color="#009E73")
-                ax.fill_between(
-                    stats["eval/total_steps"],
-                    stats["min"],
-                    stats["max"],
-                    color="#009E73",
-                    alpha=SHADED_REGION_ALPHA,
-                )
-
-                if use_direct_labels:
-                    last_x = stats["eval/total_steps"].iloc[-1]
-                    last_y = stats["mean"].iloc[-1]
-                    t = ax.text(
-                        last_x,
-                        last_y,
-                        "  CuReMix (Ours)",
-                        color="#009E73",
-                        va="center",
-                        ha="left",
-                        multialignment="left",
-                        fontweight="bold",
-                        clip_on=False,
-                        fontsize=LABEL_FONTSIZE,
-                    )
-                    texts_list.append(t)
-                max_steps = max(max_steps, stats["eval/total_steps"].iloc[-1])
+    if best_curr_stats is not None and not best_curr_stats.empty:
+        last_step = _add_curve_to_axis(
+            ax,
+            best_curr_stats["eval/total_steps"],
+            best_curr_stats["mean"],
+            best_curr_stats["min"],
+            best_curr_stats["max"],
+            "CuReMix (Ours)",
+            "#009E73",
+            use_direct_labels,
+            texts_list,
+        )
+        max_steps = max(max_steps, last_step)
 
     ax.set_xlabel("Total environment steps")
     ax.set_ylabel(ylabel)
@@ -574,63 +544,42 @@ def plot_3_curriculum_adaptation(
     texts_list1 = []
 
     # Extrinsic
-    ext_mean = stats["alpha_ext"]["mean"].values
-    ext_min = stats["alpha_ext"]["min"].values
-    ext_max = stats["alpha_ext"]["max"].values
-    ax1.plot(steps, ext_mean, label="Extrinsic", color="#56B4E9")
-    ax1.fill_between(steps, ext_min, ext_max, color="#56B4E9", alpha=SHADED_REGION_ALPHA)
-    texts_list1.append(
-        ax1.text(
-            steps[-1],
-            ext_mean[-1],
-            "  Extrinsic",
-            color="#56B4E9",
-            va="center",
-            ha="left",
-            fontweight="bold",
-            clip_on=False,
-            fontsize=LABEL_FONTSIZE,
-        )
+    _add_curve_to_axis(
+        ax1,
+        steps,
+        stats["alpha_ext"]["mean"].values,
+        stats["alpha_ext"]["min"].values,
+        stats["alpha_ext"]["max"].values,
+        "Extrinsic",
+        "#56B4E9",
+        True,
+        texts_list1,
     )
 
     # ICM
-    icm_mean = stats["alpha_icm"]["mean"].values
-    icm_min = stats["alpha_icm"]["min"].values
-    icm_max = stats["alpha_icm"]["max"].values
-    ax1.plot(steps, icm_mean, label="ICM", color="#E69F00")
-    ax1.fill_between(steps, icm_min, icm_max, color="#E69F00", alpha=SHADED_REGION_ALPHA)
-    texts_list1.append(
-        ax1.text(
-            steps[-1],
-            icm_mean[-1],
-            "  ICM",
-            color="#E69F00",
-            va="center",
-            ha="left",
-            fontweight="bold",
-            clip_on=False,
-            fontsize=LABEL_FONTSIZE,
-        )
+    _add_curve_to_axis(
+        ax1,
+        steps,
+        stats["alpha_icm"]["mean"].values,
+        stats["alpha_icm"]["min"].values,
+        stats["alpha_icm"]["max"].values,
+        "ICM",
+        "#E69F00",
+        True,
+        texts_list1,
     )
 
     # RND
-    rnd_mean = stats["alpha_rnd"]["mean"].values
-    rnd_min = stats["alpha_rnd"]["min"].values
-    rnd_max = stats["alpha_rnd"]["max"].values
-    ax1.plot(steps, rnd_mean, label="RND", color="#009E73")
-    ax1.fill_between(steps, rnd_min, rnd_max, color="#009E73", alpha=SHADED_REGION_ALPHA)
-    texts_list1.append(
-        ax1.text(
-            steps[-1],
-            rnd_mean[-1],
-            "  RND",
-            color="#009E73",
-            va="center",
-            ha="left",
-            fontweight="bold",
-            clip_on=False,
-            fontsize=LABEL_FONTSIZE,
-        )
+    _add_curve_to_axis(
+        ax1,
+        steps,
+        stats["alpha_rnd"]["mean"].values,
+        stats["alpha_rnd"]["min"].values,
+        stats["alpha_rnd"]["max"].values,
+        "RND",
+        "#009E73",
+        True,
+        texts_list1,
     )
 
     ax1.set_xlabel("Total environment steps")
@@ -660,20 +609,17 @@ def plot_3_curriculum_adaptation(
             .reset_index()
         )
 
-        ax_perf.plot(
+        last_x = _add_curve_to_axis(
+            ax_perf,
             b_stats["eval/total_steps"],
             b_stats["mean"],
-            color="#CC79A7",
-        )
-        ax_perf.fill_between(
-            b_stats["eval/total_steps"],
             b_stats["min"],
             b_stats["max"],
-            color="#CC79A7",
-            alpha=SHADED_REGION_ALPHA,
+            "",
+            "#CC79A7",
+            False,
+            None,
         )
-
-        last_x = b_stats["eval/total_steps"].iloc[-1]
 
         ax_perf.set_xlabel("Total environment steps")
         ax_perf.set_ylabel("Extrinsic return (mean)")
@@ -734,22 +680,27 @@ def _plot_4_base(
             for j, rnd in enumerate(grid_indices):
                 if round(icm + rnd, 3) > 0.9:
                     mask_invalid[i, j] = True
-                else:
-                    match = curr_eval_df[
-                        (np.isclose(curr_eval_df["icm_weight"], icm, atol=1e-3))
-                        & (np.isclose(curr_eval_df["rnd_weight"], rnd, atol=1e-3))
-                    ]
-                    if not match.empty:
-                        seed_perfs = []
-                        for _, row in match.iterrows():
-                            hist = row.get("history")
-                            if hist is not None and not hist.empty and metric_col in hist.columns:
-                                valid_hists = hist[hist["eval/total_steps"] <= target_step]
-                                if not valid_hists.empty:
-                                    val = valid_hists.iloc[-1][metric_col]
-                                    seed_perfs.append(val)
-                        if seed_perfs:
-                            grid_perf[i, j] = np.mean(seed_perfs)
+                    continue
+
+                match = curr_eval_df[
+                    (np.isclose(curr_eval_df["icm_weight"], icm, atol=1e-3))
+                    & (np.isclose(curr_eval_df["rnd_weight"], rnd, atol=1e-3))
+                ]
+                if match.empty:
+                    continue
+
+                seed_perfs = []
+                for _, row in match.iterrows():
+                    hist = row.get("history")
+                    if hist is None or hist.empty or metric_col not in hist.columns:
+                        continue
+
+                    valid_hists = hist[hist["eval/total_steps"] <= target_step]
+                    if not valid_hists.empty:
+                        seed_perfs.append(valid_hists.iloc[-1][metric_col])
+
+                if seed_perfs:
+                    grid_perf[i, j] = np.mean(seed_perfs)
 
         grid_freq = np.zeros((grid_dim, grid_dim))
 
