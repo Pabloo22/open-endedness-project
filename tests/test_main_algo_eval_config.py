@@ -3,7 +3,7 @@ import unittest
 import numpy as np
 from craftax.craftax_classic.constants import Achievement
 
-from crew.main_algo.config import TrainConfig
+from curemix.main_algo.config import TrainConfig
 
 
 def _base_config_kwargs() -> dict:

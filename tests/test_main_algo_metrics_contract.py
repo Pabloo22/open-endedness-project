@@ -2,9 +2,9 @@ import unittest
 
 import jax
 
-from crew.main_algo.config import CurriculumConfig, RNDConfig, TrainConfig
-from crew.main_algo.main_loop import full_training
-from crew.main_algo.setups import set_up_for_training
+from curemix.main_algo.config import CurriculumConfig, RNDConfig, TrainConfig
+from curemix.main_algo.main_loop import full_training
+from curemix.main_algo.setups import set_up_for_training
 
 
 class TestMainAlgoMetricsContract(unittest.TestCase):

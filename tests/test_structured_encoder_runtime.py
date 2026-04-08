@@ -5,12 +5,12 @@ import jax.numpy as jnp
 import numpy as np
 from craftax.craftax_env import make_craftax_env_from_name
 
-from crew.main_algo.config import CurriculumConfig, ICMConfig, NGUConfig, RNDConfig, TrainConfig
-from crew.main_algo.intrinsic_modules.registry import get_intrinsic_module
-from crew.main_algo.main_loop import full_training
-from crew.main_algo.setups import set_up_for_training
-from crew.main_algo.types import IntrinsicModulesUpdateData, TransitionDataBase
-from crew.networks.encoders import (
+from curemix.main_algo.config import CurriculumConfig, ICMConfig, NGUConfig, RNDConfig, TrainConfig
+from curemix.main_algo.intrinsic_modules.registry import get_intrinsic_module
+from curemix.main_algo.main_loop import full_training
+from curemix.main_algo.setups import set_up_for_training
+from curemix.main_algo.types import IntrinsicModulesUpdateData, TransitionDataBase
+from curemix.networks.encoders import (
     CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
     CRAFTAX_SYMBOLIC_ENV_ID,
     split_flat_craftax_symbolic_observation,

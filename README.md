@@ -11,7 +11,7 @@
 ├── CONTRIBUTING.md  # Collaboration guidelines for the project
 ├── README.md
 └── src
-    └── crew  # Reusable code for the project. It has type-hints and docstrings.
+    └── curemix  # Reusable code for the project. It has type-hints and docstrings.
         ├── __init__.py
 ```
 

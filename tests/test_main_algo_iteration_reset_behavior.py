@@ -6,9 +6,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from crew.main_algo.main_loop import train_one_iteration
-from crew.main_algo.reward_normalization import init_reward_normalization_stats
-from crew.main_algo.types import CurriculumState, LpEstimationData
+from curemix.main_algo.main_loop import train_one_iteration
+from curemix.main_algo.reward_normalization import init_reward_normalization_stats
+from curemix.main_algo.types import CurriculumState, LpEstimationData
 
 
 class _DummyResetOnlyEnv:
@@ -76,35 +76,35 @@ class TestTrainOneIterationResetBehavior(unittest.TestCase):
 
         with (
             mock.patch(
-                "crew.main_algo.main_loop.sample_alpha_batch",
+                "curemix.main_algo.main_loop.sample_alpha_batch",
                 return_value=(
                     jax.random.key(1),
                     jnp.asarray([[0.6, 0.4], [0.2, 0.8]], dtype=jnp.float32),
                     {"curriculum/pred_score_mean": jnp.array(0.0, dtype=jnp.float32)},
                 ),
             ),
-            mock.patch("crew.main_algo.main_loop.jax.lax.scan", side_effect=fake_scan),
+            mock.patch("curemix.main_algo.main_loop.jax.lax.scan", side_effect=fake_scan),
             mock.patch(
-                "crew.main_algo.main_loop.update_lp_normalization_stats_from_data",
+                "curemix.main_algo.main_loop.update_lp_normalization_stats_from_data",
                 return_value=SimpleNamespace(var=jnp.ones((config.num_reward_functions,), dtype=jnp.float32)),
             ),
             mock.patch(
-                "crew.main_algo.main_loop.estimate_lp_per_reward_function",
+                "curemix.main_algo.main_loop.estimate_lp_per_reward_function",
                 return_value=(
                     jnp.zeros((config.num_envs_per_batch, config.num_reward_functions), dtype=jnp.float32),
                     jnp.zeros((config.num_envs_per_batch,), dtype=jnp.int32),
                 ),
             ),
             mock.patch(
-                "crew.main_algo.main_loop.compute_scores",
+                "curemix.main_algo.main_loop.compute_scores",
                 return_value=(
                     jnp.zeros((config.num_envs_per_batch,), dtype=jnp.float32),
                     {"curriculum/score_mean": jnp.array(0.0, dtype=jnp.float32)},
                 ),
             ),
-            mock.patch("crew.main_algo.main_loop.add_alpha_score_batch", return_value=object()),
+            mock.patch("curemix.main_algo.main_loop.add_alpha_score_batch", return_value=object()),
             mock.patch(
-                "crew.main_algo.main_loop.train_score_predictor_on_buffer",
+                "curemix.main_algo.main_loop.train_score_predictor_on_buffer",
                 return_value=(jax.random.key(3), object(), {"curriculum/predictor_loss": jnp.array(0.0)}),
             ),
         ):
@@ -208,39 +208,39 @@ class TestTrainOneIterationResetBehavior(unittest.TestCase):
 
         with (
             mock.patch(
-                "crew.main_algo.main_loop.sample_alpha_batch",
+                "curemix.main_algo.main_loop.sample_alpha_batch",
                 return_value=(
                     jax.random.key(1),
                     jnp.asarray([[0.6, 0.4], [0.2, 0.8]], dtype=jnp.float32),
                     {"curriculum/pred_score_mean": jnp.array(0.0, dtype=jnp.float32)},
                 ),
             ),
-            mock.patch("crew.main_algo.main_loop.jax.lax.scan", side_effect=fake_scan),
+            mock.patch("curemix.main_algo.main_loop.jax.lax.scan", side_effect=fake_scan),
             mock.patch(
-                "crew.main_algo.main_loop.collect_data_and_update_agent_and_intrinsic_modules",
+                "curemix.main_algo.main_loop.collect_data_and_update_agent_and_intrinsic_modules",
                 side_effect=fake_inner_update,
             ),
             mock.patch(
-                "crew.main_algo.main_loop.update_lp_normalization_stats_from_data",
+                "curemix.main_algo.main_loop.update_lp_normalization_stats_from_data",
                 return_value=SimpleNamespace(var=jnp.ones((config.num_reward_functions,), dtype=jnp.float32)),
             ),
             mock.patch(
-                "crew.main_algo.main_loop.estimate_lp_per_reward_function",
+                "curemix.main_algo.main_loop.estimate_lp_per_reward_function",
                 return_value=(
                     jnp.zeros((config.num_envs_per_batch, config.num_reward_functions), dtype=jnp.float32),
                     jnp.zeros((config.num_envs_per_batch,), dtype=jnp.int32),
                 ),
             ),
             mock.patch(
-                "crew.main_algo.main_loop.compute_scores",
+                "curemix.main_algo.main_loop.compute_scores",
                 return_value=(
                     jnp.zeros((config.num_envs_per_batch,), dtype=jnp.float32),
                     {"curriculum/score_mean": jnp.array(0.0, dtype=jnp.float32)},
                 ),
             ),
-            mock.patch("crew.main_algo.main_loop.add_alpha_score_batch", return_value=object()),
+            mock.patch("curemix.main_algo.main_loop.add_alpha_score_batch", return_value=object()),
             mock.patch(
-                "crew.main_algo.main_loop.train_score_predictor_on_buffer",
+                "curemix.main_algo.main_loop.train_score_predictor_on_buffer",
                 return_value=(jax.random.key(3), object(), {"curriculum/predictor_loss": jnp.array(0.0)}),
             ),
         ):

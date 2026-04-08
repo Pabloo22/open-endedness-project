@@ -1,7 +1,7 @@
 import unittest
 from types import SimpleNamespace
 
-from crew.main_algo.main_loop import _validate_supported_curriculum_intrinsic_modules
+from curemix.main_algo.main_loop import _validate_supported_curriculum_intrinsic_modules
 
 
 class TestCurriculumIntrinsicModuleValidation(unittest.TestCase):

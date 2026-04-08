@@ -4,11 +4,11 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from crew.main_algo.actor_critic import ActorCriticTransformer
-from crew.main_algo.intrinsic_modules.icm import ICMNet
-from crew.main_algo.intrinsic_modules.ngu import NGUEmbeddingNetwork
-from crew.main_algo.intrinsic_modules.rnd import RNDTargetAndPredictor
-from crew.networks.encoders import (
+from curemix.main_algo.actor_critic import ActorCriticTransformer
+from curemix.main_algo.intrinsic_modules.icm import ICMNet
+from curemix.main_algo.intrinsic_modules.ngu import NGUEmbeddingNetwork
+from curemix.main_algo.intrinsic_modules.rnd import RNDTargetAndPredictor
+from curemix.networks.encoders import (
     CRAFTAX_CLASSIC_SYMBOLIC_ENV_ID,
     CRAFTAX_SYMBOLIC_ENV_ID,
     build_observation_encoder,

@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from crew.experiments.run_training import (
+from curemix.experiments.run_training import (
     build_run_config,
     build_smoke_run_config,
     build_training_run_config,
@@ -40,10 +40,12 @@ class TestMainAlgoRunTrainingDispatch(unittest.TestCase):
         }
 
         with (
-            mock.patch("crew.experiments.run_training.set_up_for_training", return_value=self._setup_tuple()),
-            mock.patch("crew.experiments.run_training.full_training", return_value=curriculum_out) as curriculum_mock,
-            mock.patch("crew.experiments.run_training.full_training_baseline") as baseline_mock,
-            mock.patch("crew.experiments.run_training.jax.block_until_ready", side_effect=lambda x: x),
+            mock.patch("curemix.experiments.run_training.set_up_for_training", return_value=self._setup_tuple()),
+            mock.patch(
+                "curemix.experiments.run_training.full_training", return_value=curriculum_out
+            ) as curriculum_mock,
+            mock.patch("curemix.experiments.run_training.full_training_baseline") as baseline_mock,
+            mock.patch("curemix.experiments.run_training.jax.block_until_ready", side_effect=lambda x: x),
         ):
             out = run_main_algo_training(config=config, save_results=False)
 
@@ -66,10 +68,12 @@ class TestMainAlgoRunTrainingDispatch(unittest.TestCase):
         }
 
         with (
-            mock.patch("crew.experiments.run_training.set_up_for_training", return_value=self._setup_tuple()),
-            mock.patch("crew.experiments.run_training.full_training") as curriculum_mock,
-            mock.patch("crew.experiments.run_training.full_training_baseline", return_value=baseline_out) as baseline_mock,
-            mock.patch("crew.experiments.run_training.jax.block_until_ready", side_effect=lambda x: x),
+            mock.patch("curemix.experiments.run_training.set_up_for_training", return_value=self._setup_tuple()),
+            mock.patch("curemix.experiments.run_training.full_training") as curriculum_mock,
+            mock.patch(
+                "curemix.experiments.run_training.full_training_baseline", return_value=baseline_out
+            ) as baseline_mock,
+            mock.patch("curemix.experiments.run_training.jax.block_until_ready", side_effect=lambda x: x),
         ):
             out = run_main_algo_training(config=config, save_results=False)
 
@@ -107,14 +111,14 @@ class TestMainAlgoRunTrainingDispatch(unittest.TestCase):
         }
 
         with (
-            mock.patch("crew.experiments.run_training.set_up_for_training", return_value=self._setup_tuple()),
-            mock.patch("crew.experiments.run_training.full_training", return_value=curriculum_out),
-            mock.patch("crew.experiments.run_training.full_training_baseline", return_value=baseline_out),
-            mock.patch("crew.experiments.run_training.jax.block_until_ready", side_effect=lambda x: x),
-            mock.patch("crew.experiments.run_training.build_trained_weights_path") as build_path_mock,
-            mock.patch("crew.experiments.run_training.orbax.PyTreeCheckpointer"),
-            mock.patch("crew.experiments.run_training.orbax_utils.save_args_from_target", return_value=None),
-            mock.patch("crew.experiments.run_training.flax.core.freeze", side_effect=lambda x: x),
+            mock.patch("curemix.experiments.run_training.set_up_for_training", return_value=self._setup_tuple()),
+            mock.patch("curemix.experiments.run_training.full_training", return_value=curriculum_out),
+            mock.patch("curemix.experiments.run_training.full_training_baseline", return_value=baseline_out),
+            mock.patch("curemix.experiments.run_training.jax.block_until_ready", side_effect=lambda x: x),
+            mock.patch("curemix.experiments.run_training.build_trained_weights_path") as build_path_mock,
+            mock.patch("curemix.experiments.run_training.orbax.PyTreeCheckpointer"),
+            mock.patch("curemix.experiments.run_training.orbax_utils.save_args_from_target", return_value=None),
+            mock.patch("curemix.experiments.run_training.flax.core.freeze", side_effect=lambda x: x),
         ):
             path_obj = mock.MagicMock()
             path_obj.parent.mkdir = mock.MagicMock()
@@ -160,9 +164,11 @@ class TestRunTrainingPresetSelection(unittest.TestCase):
         smoke_config = object()
 
         with (
-            mock.patch("crew.experiments.run_training.build_smoke_run_config", return_value=smoke_config) as smoke_mock,
-            mock.patch("crew.experiments.run_training.build_training_run_config") as training_mock,
-            mock.patch("crew.experiments.run_training.run_main_algo_training") as run_mock,
+            mock.patch(
+                "curemix.experiments.run_training.build_smoke_run_config", return_value=smoke_config
+            ) as smoke_mock,
+            mock.patch("curemix.experiments.run_training.build_training_run_config") as training_mock,
+            mock.patch("curemix.experiments.run_training.run_main_algo_training") as run_mock,
         ):
             main(["--smoke-run", "--save-results"])
 
@@ -174,11 +180,11 @@ class TestRunTrainingPresetSelection(unittest.TestCase):
         training_config = object()
 
         with (
-            mock.patch("crew.experiments.run_training.build_smoke_run_config") as smoke_mock,
+            mock.patch("curemix.experiments.run_training.build_smoke_run_config") as smoke_mock,
             mock.patch(
-                "crew.experiments.run_training.build_training_run_config", return_value=training_config
+                "curemix.experiments.run_training.build_training_run_config", return_value=training_config
             ) as training_mock,
-            mock.patch("crew.experiments.run_training.run_main_algo_training") as run_mock,
+            mock.patch("curemix.experiments.run_training.run_main_algo_training") as run_mock,
         ):
             main([])
 

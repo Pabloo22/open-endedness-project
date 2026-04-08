@@ -2,9 +2,9 @@ import unittest
 
 import jax
 
-from crew.main_algo.baseline_main_loop import full_training_baseline
-from crew.main_algo.config import TrainConfig
-from crew.main_algo.setups import set_up_for_training
+from curemix.main_algo.baseline_main_loop import full_training_baseline
+from curemix.main_algo.config import TrainConfig
+from curemix.main_algo.setups import set_up_for_training
 
 
 class TestMainAlgoBaselineMetricsContract(unittest.TestCase):

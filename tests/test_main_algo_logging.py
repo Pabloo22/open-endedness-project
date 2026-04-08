@@ -6,7 +6,7 @@ import jax.numpy as jnp
 import numpy as np
 from craftax.craftax_classic.constants import Achievement
 
-from crew.main_algo.logging import (
+from curemix.main_algo.logging import (
     build_eval_log_payload,
     build_training_batch_log_payload,
     build_wandb_group,
@@ -234,7 +234,7 @@ class TestMainAlgoLogging(unittest.TestCase):
             "eval/total_steps": jnp.array(128, dtype=jnp.int32),
         }
 
-        with mock.patch("crew.main_algo.logging.wandb", fake_wandb):
+        with mock.patch("curemix.main_algo.logging.wandb", fake_wandb):
             log_outer_batch_to_wandb(
                 run=object(),
                 batch_metrics=batch_metrics,
@@ -308,7 +308,7 @@ class TestMainAlgoLogging(unittest.TestCase):
             "eval/total_steps": jnp.array(128, dtype=jnp.int32),
         }
 
-        with mock.patch("crew.main_algo.logging.wandb", fake_wandb):
+        with mock.patch("curemix.main_algo.logging.wandb", fake_wandb):
             log_outer_batch_to_wandb(
                 run=object(),
                 batch_metrics=batch_metrics,

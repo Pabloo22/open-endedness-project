@@ -5,8 +5,8 @@ import jax.numpy as jnp
 import numpy as np
 from craftax.craftax_env import make_craftax_env_from_name
 
-from crew.main_algo.setups import _resolve_optimistic_reset_ratio
-from crew.main_algo.wrappers import (
+from curemix.main_algo.setups import _resolve_optimistic_reset_ratio
+from curemix.main_algo.wrappers import (
     FixedResetKeyEnvWrapper,
     OptimisticResetVecEnvWrapper,
     SparseCraftaxWrapper,

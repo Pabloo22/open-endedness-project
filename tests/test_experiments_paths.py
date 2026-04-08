@@ -4,7 +4,7 @@ from types import SimpleNamespace
 
 from craftax.craftax_classic.constants import Achievement
 
-from crew.experiments.paths import build_best_weights_rollouts_path, build_trained_weights_path
+from curemix.experiments.paths import build_best_weights_rollouts_path, build_trained_weights_path
 
 
 class TestExperimentPaths(unittest.TestCase):
