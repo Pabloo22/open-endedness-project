@@ -1615,7 +1615,7 @@ def plot_4_combined_training_stages(
     cbar.set_label("Return (% of max)")
 
     fig.supxlabel("RND weight")
-    fig.supylabel("ICM weight", x=0.03)
+    fig.supylabel("ICM weight", x=0.02)
     fig.suptitle(_format_achievement_name_for_title(achievement_filter), y=0.98, fontsize=9)
     fig.subplots_adjust(left=0.08, right=0.95, top=0.82, bottom=0.20)
 
