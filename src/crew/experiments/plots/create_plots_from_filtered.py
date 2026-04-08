@@ -1,19 +1,13 @@
 """Create paper plots from compact filtered artifacts only."""
 
 from pathlib import Path
-import matplotlib.pyplot as plt
 
 from crew.experiments.plots.create_plots_from_local import load_filtered_results
 from crew.experiments.plots.plot_functions import (
-    plot_1_heatmaps,
     plot_1_combined_heatmaps,
-    plot_2_learning_curves,
-    plot_2_b_learning_curves,
     plot_2_combined_learning_curves,
-    plot_3_curriculum_adaptation,
-    plot_4_contour_overlay,
-    plot_4_b,
-    plot_4_c,
+    plot_3_combined_curriculum_adaptation,
+    plot_4_combined_training_stages,
 )
 
 # ==========================================
@@ -64,9 +58,11 @@ if __name__ == "__main__":
         achievement_images_dir = Path(IMAGES_DIR) / selected_achievement
         achievement_images_dir.mkdir(parents=True, exist_ok=True)
 
-        print(
-            f"\nLoaded {len(df)} filtered runs for '{selected_achievement}'. Creating plots in {achievement_images_dir}..."
-        )
+        message = f"\nLoaded {len(df)} filtered runs for '{selected_achievement}'."
+        print(f"{message} Creating plots in {achievement_images_dir}...")
+
+        # One Plot 4-style 1x4 figure per achievement in images/
+        plot_4_combined_training_stages(df, IMAGES_DIR, achievement_filter=selected_achievement)
 
         # plot_1_heatmaps(df, str(achievement_images_dir), achievement_filter=selected_achievement)
         # plot_2_learning_curves(df, str(achievement_images_dir), achievement_filter=selected_achievement)
@@ -77,10 +73,6 @@ if __name__ == "__main__":
         #     achievement_filter=selected_achievement,
         #     include_baseline_performance=True,
         # )
-        # plot_4_contour_overlay(df, str(achievement_images_dir), achievement_filter=selected_achievement)
-        # plot_4_b(df, str(achievement_images_dir), achievement_filter=selected_achievement)
-        # plot_4_c(df, str(achievement_images_dir), achievement_filter=selected_achievement)
-
         # plt.close("all")
 
     if combined_plot_data:
@@ -88,5 +80,6 @@ if __name__ == "__main__":
         images_root.mkdir(parents=True, exist_ok=True)
         plot_1_combined_heatmaps(combined_plot_data, str(images_root))
         plot_2_combined_learning_curves(combined_plot_data, str(images_root))
+        plot_3_combined_curriculum_adaptation(combined_plot_data, str(images_root))
 
     print("\nDone. Plots generated from filtered artifacts.")
