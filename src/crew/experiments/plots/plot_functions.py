@@ -201,8 +201,6 @@ def _plot_heatmaps_base(
         plt.savefig(save_path, format="pdf", bbox_inches="tight")
         print(f"Saved heatmap to {save_path}")
 
-        plt.show()
-
 
 def plot_1_heatmaps(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe", grid_size=8):
     max_score = len(achievement_filter.split("+")) if achievement_filter else 1.0
@@ -361,8 +359,6 @@ def _plot_learning_curves_base(df, save_dir, achievement_filter, metric_col, pre
     plt.savefig(save_path, format="pdf", bbox_inches="tight")
     print(f"Saved {prefix.replace('_', ' ').title()} to {save_path}")
 
-    plt.show()
-
 
 def plot_2_learning_curves(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe"):
     _plot_learning_curves_base(
@@ -492,8 +488,6 @@ def plot_2_b_learning_curves(
     save_path = os.path.join(save_dir, f"{prefix}_learning_curves_{achievement_filter}.pdf")
     plt.savefig(save_path, format="pdf", bbox_inches="tight")
     print(f"Saved {prefix.replace('_', ' ').title()} to {save_path}")
-
-    plt.show()
 
 
 def plot_6_learning_curves(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe"):
@@ -630,8 +624,6 @@ def plot_3_curriculum_adaptation(
         save_path_perf = os.path.join(save_dir, f"plot_3_curriculum_adaptation_performance_{achievement_filter}.pdf")
         fig2.savefig(save_path_perf, format="pdf", bbox_inches="tight")
         print(f"Saved Plot 3 Performance to {save_path_perf}")
-
-    plt.show()
 
 
 def _plot_4_base(
