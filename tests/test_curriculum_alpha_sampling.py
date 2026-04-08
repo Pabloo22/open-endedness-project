@@ -6,11 +6,11 @@ import jax.numpy as jnp
 import numpy as np
 from jax.tree_util import Partial
 
-from crew.main_algo.curriculum.alpha_sampling import sample_alpha_batch
-from crew.main_algo.curriculum.lp_normalization import init_lp_normalization_stats
-from crew.main_algo.curriculum.replay_buffer import init_alpha_score_replay_buffer
-from crew.main_algo.curriculum.score_predictor import init_score_predictor_train_state
-from crew.main_algo.types import CurriculumState
+from curemix.main_algo.curriculum.alpha_sampling import sample_alpha_batch
+from curemix.main_algo.curriculum.lp_normalization import init_lp_normalization_stats
+from curemix.main_algo.curriculum.replay_buffer import init_alpha_score_replay_buffer
+from curemix.main_algo.curriculum.score_predictor import init_score_predictor_train_state
+from curemix.main_algo.types import CurriculumState
 
 
 def _make_config(

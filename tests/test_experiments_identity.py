@@ -3,7 +3,7 @@ from types import SimpleNamespace
 
 from craftax.craftax_classic.constants import Achievement
 
-from crew.experiments.identity import (
+from curemix.experiments.identity import (
     build_experiment_identity,
     build_intrinsic_rewards_used,
     build_task_identifier,

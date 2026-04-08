@@ -10,7 +10,7 @@ import jax.numpy as jnp
 from craftax.craftax.envs.craftax_symbolic_env import CraftaxSymbolicEnv
 from jax.tree_util import Partial
 
-from crew.main_algo.wrappers import AutoResetEnvWrapper
+from curemix.main_algo.wrappers import AutoResetEnvWrapper
 
 
 @dataclass

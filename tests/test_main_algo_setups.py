@@ -2,8 +2,8 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from crew.main_algo.config import TrainConfig
-from crew.main_algo.setups import set_up_for_training
+from curemix.main_algo.config import TrainConfig
+from curemix.main_algo.setups import set_up_for_training
 
 
 def _base_config_kwargs() -> dict:

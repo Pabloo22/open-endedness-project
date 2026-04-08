@@ -6,9 +6,9 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from crew.main_algo.main_loop import train_one_iteration
-from crew.main_algo.reward_normalization import init_reward_normalization_stats
-from crew.main_algo.types import CurriculumState, LpEstimationData
+from curemix.main_algo.main_loop import train_one_iteration
+from curemix.main_algo.reward_normalization import init_reward_normalization_stats
+from curemix.main_algo.types import CurriculumState, LpEstimationData
 
 
 class _DummyResetOnlyEnv:

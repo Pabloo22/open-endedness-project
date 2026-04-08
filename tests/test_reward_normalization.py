@@ -3,7 +3,7 @@ import unittest
 import jax.numpy as jnp
 import numpy as np
 
-from crew.main_algo.reward_normalization import compute_forward_returns, init_reward_normalization_stats
+from curemix.main_algo.reward_normalization import compute_forward_returns, init_reward_normalization_stats
 
 
 class TestRewardNormalization(unittest.TestCase):

@@ -5,7 +5,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from crew.main_algo.curriculum.replay_buffer import add_alpha_score_batch, init_alpha_score_replay_buffer
+from curemix.main_algo.curriculum.replay_buffer import add_alpha_score_batch, init_alpha_score_replay_buffer
 
 
 def _make_config(num_envs_per_batch: int, num_reward_functions: int, replay_buffer_num_batches: int):

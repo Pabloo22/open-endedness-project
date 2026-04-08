@@ -4,8 +4,8 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from crew.main_algo.curriculum.lp_estimation import estimate_lp_per_reward_function
-from crew.main_algo.types import LpEstimationData
+from curemix.main_algo.curriculum.lp_estimation import estimate_lp_per_reward_function
+from curemix.main_algo.types import LpEstimationData
 
 
 def _ols_slope_numpy(x: np.ndarray, y: np.ndarray, eps: float) -> float:

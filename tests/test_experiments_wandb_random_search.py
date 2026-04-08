@@ -2,10 +2,10 @@ import unittest
 from unittest.mock import patch
 
 import numpy as np
-from crew.experiments.tuning_configs import _active_configs as active_tuning_configs
+from curemix.experiments.tuning_configs import _active_configs as active_tuning_configs
 
-from crew.experiments import tuning_configs
-from crew.hyp_tuning.wandb_hp_search import (
+from curemix.experiments import tuning_configs
+from curemix.hyp_tuning.wandb_hp_search import (
     DEFAULT_BASELINE_INTRINSIC_ALPHA,
     DEFAULT_OBJECTIVE_METRIC,
     SWEEP_METHOD_GRID,

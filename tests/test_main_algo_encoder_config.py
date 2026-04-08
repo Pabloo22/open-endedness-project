@@ -1,6 +1,6 @@
 import unittest
 
-from crew.main_algo.config import ICMConfig, NGUConfig, RNDConfig, TrainConfig
+from curemix.main_algo.config import ICMConfig, NGUConfig, RNDConfig, TrainConfig
 
 
 def _base_config_kwargs() -> dict:

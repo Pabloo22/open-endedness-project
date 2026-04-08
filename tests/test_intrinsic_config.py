@@ -4,7 +4,7 @@ import sys
 sys.path.append("src")
 
 try:
-    from crew.hyp_tuning.wandb_hp_search import build_base_tuning_config
+    from curemix.hyp_tuning.wandb_hp_search import build_base_tuning_config
 
     config = build_base_tuning_config(
         tuning_phase="intrinsic",

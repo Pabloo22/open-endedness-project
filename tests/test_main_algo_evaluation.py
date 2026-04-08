@@ -8,8 +8,8 @@ import optax
 from flax.training.train_state import TrainState
 from jax.tree_util import Partial
 
-from crew.main_algo.actor_critic import Categorical
-from crew.main_algo.evaluation import evaluate_policy_on_alphas, infer_achievement_names
+from curemix.main_algo.actor_critic import Categorical
+from curemix.main_algo.evaluation import evaluate_policy_on_alphas, infer_achievement_names
 
 
 class _DummyAutoResetEvalEnv:

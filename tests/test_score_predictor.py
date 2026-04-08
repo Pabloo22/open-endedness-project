@@ -6,8 +6,8 @@ import jax.numpy as jnp
 import numpy as np
 from jax.tree_util import Partial
 
-from crew.main_algo.curriculum.replay_buffer import add_alpha_score_batch, init_alpha_score_replay_buffer
-from crew.main_algo.curriculum.score_predictor import (
+from curemix.main_algo.curriculum.replay_buffer import add_alpha_score_batch, init_alpha_score_replay_buffer
+from curemix.main_algo.curriculum.score_predictor import (
     init_score_predictor_train_state,
     train_score_predictor_on_buffer,
 )

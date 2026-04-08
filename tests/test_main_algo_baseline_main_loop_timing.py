@@ -5,7 +5,7 @@ from unittest import mock
 import jax
 import jax.numpy as jnp
 
-from crew.main_algo.baseline_main_loop import full_training_baseline
+from curemix.main_algo.baseline_main_loop import full_training_baseline
 
 
 class _DummyResetOnlyEnv:

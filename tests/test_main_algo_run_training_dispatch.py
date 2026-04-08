@@ -2,7 +2,7 @@ import unittest
 from types import SimpleNamespace
 from unittest import mock
 
-from crew.experiments.run_training import (
+from curemix.experiments.run_training import (
     build_run_config,
     build_smoke_run_config,
     build_training_run_config,

@@ -3,13 +3,13 @@ import unittest
 import jax.numpy as jnp
 import numpy as np
 
-from crew.main_algo.curriculum.lp_normalization import (
+from curemix.main_algo.curriculum.lp_normalization import (
     compute_lp_batch_moments,
     init_lp_normalization_stats,
     update_lp_normalization_stats,
     update_lp_normalization_stats_from_data,
 )
-from crew.main_algo.types import LpEstimationData
+from curemix.main_algo.types import LpEstimationData
 
 
 class TestLpNormalization(unittest.TestCase):

@@ -4,7 +4,7 @@ from unittest import mock
 
 import jax.numpy as jnp
 
-from crew.main_algo.main_loop import full_training
+from curemix.main_algo.main_loop import full_training
 
 
 def _fake_train_one_iteration(

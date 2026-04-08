@@ -4,7 +4,7 @@ import jax
 import jax.numpy as jnp
 import numpy as np
 
-from crew.main_algo.curriculum.score_estimation import compute_scores
+from curemix.main_algo.curriculum.score_estimation import compute_scores
 
 
 class TestScoreEstimation(unittest.TestCase):
