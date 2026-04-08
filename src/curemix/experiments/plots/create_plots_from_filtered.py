@@ -59,7 +59,7 @@ if __name__ == "__main__":
         achievement_images_dir.mkdir(parents=True, exist_ok=True)
 
         message = f"\nLoaded {len(df)} filtered runs for '{selected_achievement}'."
-        print(f"{message} Creating plots in {achievement_images_dir}...")
+        # print(f"{message} Creating plots in {achievement_images_dir}...")
 
         # One Plot 4-style 1x4 figure per achievement in images/
         plot_4_combined_training_stages(df, IMAGES_DIR, achievement_filter=selected_achievement)

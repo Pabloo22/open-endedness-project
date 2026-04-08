@@ -1,6 +1,6 @@
 # Config Fields Tuning Reference
 
-This file documents the fields in `src/crew/main_algo/config.py`
+This file documents the fields in `src/curemix/main_algo/config.py`
 
 Column meanings:
 - **Field**: config key.

@@ -1,4 +1,4 @@
-"""nohup poetry run python -m crew.experiments.fixed_weighting_runs >& nohup_2.out &"""
+"""nohup poetry run python -m curemix.experiments.fixed_weighting_runs >& nohup_2.out &"""
 
 from __future__ import annotations
 
@@ -15,7 +15,7 @@ from curemix.experiments.run_training import run_main_algo_training
 from curemix.main_algo.config import TrainConfig
 
 # Edit these variables directly before running:
-# `poetry run python -m crew.experiments.fixed_weighting_runs`
+# `poetry run python -m curemix.experiments.fixed_weighting_runs`
 ENV_ID = "Craftax-Classic-Symbolic-v1"
 
 # Keep these as Craftax Classic `Achievement` enum members.

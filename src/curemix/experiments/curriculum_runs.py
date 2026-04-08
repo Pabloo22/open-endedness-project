@@ -13,7 +13,7 @@ from curemix.experiments.run_training import run_main_algo_training
 from curemix.main_algo.config import TrainConfig
 
 # Edit these variables directly before running:
-# `poetry run python -m crew.experiments.curriculum_runs`
+# `poetry run python -m curemix.experiments.curriculum_runs`
 ENV_ID = "Craftax-Classic-Symbolic-v1"
 
 # Keep these as Craftax Classic `Achievement` enum members.

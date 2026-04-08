@@ -6,7 +6,7 @@ videos are logged to W&B as ``wandb.Video`` objects.
 
 Usage from the training loop::
 
-    from crew.main_algo.video import record_and_log_videos
+    from curemix.main_algo.video import record_and_log_videos
     record_and_log_videos(
         run=wandb_run,
         train_state=agent_train_state,

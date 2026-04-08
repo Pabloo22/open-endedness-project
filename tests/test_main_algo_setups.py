@@ -39,15 +39,27 @@ class TestSetUpForTrainingResetWrapperComposition(unittest.TestCase):
         base_env = self._make_base_env()
 
         with (
-            mock.patch("crew.main_algo.setups.make_craftax_env_from_name", return_value=base_env),
-            mock.patch("crew.main_algo.setups.SparseCraftaxWrapper", return_value="sparse_env") as sparse_wrapper_mock,
-            mock.patch("crew.main_algo.setups.FixedResetKeyEnvWrapper", return_value="fixed_env") as fixed_wrapper_mock,
-            mock.patch("crew.main_algo.setups.OptimisticResetVecEnvWrapper", return_value="vec_env") as vec_wrapper_mock,
-            mock.patch("crew.main_algo.setups.setup_actor_critic_train_state", return_value=("rng_after_agent", "agent")),
-            mock.patch("crew.main_algo.setups.get_selected_intrinsic_modules", return_value=()),
-            mock.patch("crew.main_algo.setups.setup_intrinsic_module_states", return_value=("rng_after_intrinsic", ())),
-            mock.patch("crew.main_algo.setups.init_reward_normalization_stats", return_value="reward_stats"),
-            mock.patch("crew.main_algo.setups.initialize_curriculum_state", return_value=("rng_final", "curriculum_state")),
+            mock.patch("curemix.main_algo.setups.make_craftax_env_from_name", return_value=base_env),
+            mock.patch(
+                "curemix.main_algo.setups.SparseCraftaxWrapper", return_value="sparse_env"
+            ) as sparse_wrapper_mock,
+            mock.patch(
+                "curemix.main_algo.setups.FixedResetKeyEnvWrapper", return_value="fixed_env"
+            ) as fixed_wrapper_mock,
+            mock.patch(
+                "curemix.main_algo.setups.OptimisticResetVecEnvWrapper", return_value="vec_env"
+            ) as vec_wrapper_mock,
+            mock.patch(
+                "curemix.main_algo.setups.setup_actor_critic_train_state", return_value=("rng_after_agent", "agent")
+            ),
+            mock.patch("curemix.main_algo.setups.get_selected_intrinsic_modules", return_value=()),
+            mock.patch(
+                "curemix.main_algo.setups.setup_intrinsic_module_states", return_value=("rng_after_intrinsic", ())
+            ),
+            mock.patch("curemix.main_algo.setups.init_reward_normalization_stats", return_value="reward_stats"),
+            mock.patch(
+                "curemix.main_algo.setups.initialize_curriculum_state", return_value=("rng_final", "curriculum_state")
+            ),
         ):
             output = set_up_for_training(config)
 

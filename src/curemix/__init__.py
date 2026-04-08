@@ -1,2 +1,2 @@
 def testing():
-    print("This is the crew package")
+    print("This is the curemix package")

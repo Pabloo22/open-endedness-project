@@ -88,24 +88,26 @@ class TestMainAlgoBaselineMainLoopTiming(unittest.TestCase):
         env = _DummyResetOnlyEnv()
 
         with (
-            mock.patch("crew.main_algo.baseline_main_loop.jax.jit", side_effect=lambda fn: fn),
+            mock.patch("curemix.main_algo.baseline_main_loop.jax.jit", side_effect=lambda fn: fn),
             mock.patch(
-                "crew.main_algo.baseline_main_loop.jax.block_until_ready",
+                "curemix.main_algo.baseline_main_loop.jax.block_until_ready",
                 side_effect=lambda x: x,
             ) as block_until_ready_mock,
             mock.patch(
-                "crew.main_algo.baseline_main_loop.train_one_iteration_baseline",
+                "curemix.main_algo.baseline_main_loop.train_one_iteration_baseline",
                 side_effect=_fake_train_one_iteration_baseline,
             ),
             mock.patch(
-                "crew.main_algo.baseline_main_loop.evaluate_policy_on_alphas",
+                "curemix.main_algo.baseline_main_loop.evaluate_policy_on_alphas",
                 side_effect=_fake_evaluate_policy_on_alphas,
             ) as evaluate_mock,
-            mock.patch("crew.main_algo.baseline_main_loop.infer_achievement_names", return_value=("Achievements/a",)),
-            mock.patch("crew.main_algo.baseline_main_loop.init_wandb_run", return_value=None),
-            mock.patch("crew.main_algo.baseline_main_loop.finish_wandb_run"),
-            mock.patch("crew.main_algo.baseline_main_loop.log_outer_batch_to_wandb"),
-            mock.patch("crew.main_algo.baseline_main_loop.time.perf_counter", side_effect=[10.0, 11.0, 12.0]),
+            mock.patch(
+                "curemix.main_algo.baseline_main_loop.infer_achievement_names", return_value=("Achievements/a",)
+            ),
+            mock.patch("curemix.main_algo.baseline_main_loop.init_wandb_run", return_value=None),
+            mock.patch("curemix.main_algo.baseline_main_loop.finish_wandb_run"),
+            mock.patch("curemix.main_algo.baseline_main_loop.log_outer_batch_to_wandb"),
+            mock.patch("curemix.main_algo.baseline_main_loop.time.perf_counter", side_effect=[10.0, 11.0, 12.0]),
             mock.patch("builtins.print") as print_mock,
         ):
             output = full_training_baseline(
@@ -129,25 +131,27 @@ class TestMainAlgoBaselineMainLoopTiming(unittest.TestCase):
         env = _DummyResetOnlyEnv()
 
         with (
-            mock.patch("crew.main_algo.baseline_main_loop.jax.jit", side_effect=lambda fn: fn),
+            mock.patch("curemix.main_algo.baseline_main_loop.jax.jit", side_effect=lambda fn: fn),
             mock.patch(
-                "crew.main_algo.baseline_main_loop.jax.block_until_ready",
+                "curemix.main_algo.baseline_main_loop.jax.block_until_ready",
                 side_effect=lambda x: x,
             ) as block_until_ready_mock,
             mock.patch(
-                "crew.main_algo.baseline_main_loop.train_one_iteration_baseline",
+                "curemix.main_algo.baseline_main_loop.train_one_iteration_baseline",
                 side_effect=_fake_train_one_iteration_baseline,
             ),
             mock.patch(
-                "crew.main_algo.baseline_main_loop.evaluate_policy_on_alphas",
+                "curemix.main_algo.baseline_main_loop.evaluate_policy_on_alphas",
                 side_effect=_fake_evaluate_policy_on_alphas,
             ),
-            mock.patch("crew.main_algo.baseline_main_loop.infer_achievement_names", return_value=("Achievements/a",)),
-            mock.patch("crew.main_algo.baseline_main_loop.init_wandb_run", return_value=None),
-            mock.patch("crew.main_algo.baseline_main_loop.finish_wandb_run"),
-            mock.patch("crew.main_algo.baseline_main_loop.log_outer_batch_to_wandb"),
             mock.patch(
-                "crew.main_algo.baseline_main_loop.time.perf_counter",
+                "curemix.main_algo.baseline_main_loop.infer_achievement_names", return_value=("Achievements/a",)
+            ),
+            mock.patch("curemix.main_algo.baseline_main_loop.init_wandb_run", return_value=None),
+            mock.patch("curemix.main_algo.baseline_main_loop.finish_wandb_run"),
+            mock.patch("curemix.main_algo.baseline_main_loop.log_outer_batch_to_wandb"),
+            mock.patch(
+                "curemix.main_algo.baseline_main_loop.time.perf_counter",
                 side_effect=[10.0, 11.0, 12.0, 13.0, 14.0, 15.0, 16.0, 17.0, 18.0, 19.0, 20.0, 21.0, 22.0],
             ),
             mock.patch("builtins.print") as print_mock,
@@ -180,21 +184,23 @@ class TestMainAlgoBaselineMainLoopTiming(unittest.TestCase):
         env = _DummyResetOnlyEnv()
 
         with (
-            mock.patch("crew.main_algo.baseline_main_loop.jax.jit", side_effect=lambda fn: fn),
+            mock.patch("curemix.main_algo.baseline_main_loop.jax.jit", side_effect=lambda fn: fn),
             mock.patch(
-                "crew.main_algo.baseline_main_loop.train_one_iteration_baseline",
+                "curemix.main_algo.baseline_main_loop.train_one_iteration_baseline",
                 side_effect=_fake_train_one_iteration_baseline,
             ),
             mock.patch(
-                "crew.main_algo.baseline_main_loop.evaluate_policy_on_alphas",
+                "curemix.main_algo.baseline_main_loop.evaluate_policy_on_alphas",
                 side_effect=_fake_evaluate_policy_on_alphas,
             ) as evaluate_mock,
-            mock.patch("crew.main_algo.baseline_main_loop.infer_achievement_names", return_value=("Achievements/a",)),
-            mock.patch("crew.main_algo.baseline_main_loop.init_wandb_run", return_value=None),
-            mock.patch("crew.main_algo.baseline_main_loop.finish_wandb_run"),
-            mock.patch("crew.main_algo.baseline_main_loop.log_outer_batch_to_wandb"),
             mock.patch(
-                "crew.main_algo.baseline_main_loop.time.perf_counter",
+                "curemix.main_algo.baseline_main_loop.infer_achievement_names", return_value=("Achievements/a",)
+            ),
+            mock.patch("curemix.main_algo.baseline_main_loop.init_wandb_run", return_value=None),
+            mock.patch("curemix.main_algo.baseline_main_loop.finish_wandb_run"),
+            mock.patch("curemix.main_algo.baseline_main_loop.log_outer_batch_to_wandb"),
+            mock.patch(
+                "curemix.main_algo.baseline_main_loop.time.perf_counter",
                 side_effect=[float(x) for x in range(100)],
             ),
         ):

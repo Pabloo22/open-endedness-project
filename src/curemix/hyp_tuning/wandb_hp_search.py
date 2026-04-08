@@ -8,7 +8,7 @@ Typical workflow:
 1. Adjust the search space in ``build_default_sweep_config`` to the config
     fields and value ranges you want to tune.
 2. Start a new sweep and agent with a command such as
-    ``poetry run python -m crew.experiments.wandb_random_search --count 100 --tuning-phase generic``.
+    ``poetry run python -m curemix.experiments.wandb_random_search --count 100 --tuning-phase generic``.
 3. If you only want to create the sweep and inspect it in W&B before running
     trials, use ``--create-only``.
 4. If you already have a sweep id, reuse it with ``--sweep-id <id>``.
@@ -27,32 +27,32 @@ full checkpoint and training artifacts.
 
 Commdands run so far:
 
-poetry run python -m crew.experiments.wandb_hp_search --count 100 --tuning-phase generic``
+poetry run python -m curemix.experiments.wandb_hp_search --count 100 --tuning-phase generic``
 
-poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid --enable-inner-wandb
+poetry run python -m curemix.experiments.wandb_hp_search --tuning-phase generic --method grid --enable-inner-wandb
 
-nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
+nohup poetry run python -m curemix.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
     --enable-inner-wandb --count 100 >& nohup.out &
 
 with `get_best_generic_params`:
-nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid  \
+nohup poetry run python -m curemix.experiments.wandb_hp_search --tuning-phase generic --method grid  \
     --enable-inner-wandb --fixed-override video_num_episodes=5 --total-timesteps 1_000_000_000 >& nohup.out &
 
 with `get_best_lightweight_generic_params`:
-nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
+nohup poetry run python -m curemix.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
     --enable-inner-wandb --fixed-override video_num_episodes=1 --count 100 >& nohup.out &
 
 with `get_best_generic_params`:
-nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase generic --method grid  \
+nohup poetry run python -m curemix.experiments.wandb_hp_search --tuning-phase generic --method grid  \
     --enable-inner-wandb --fixed-override video_num_episodes=5 --total-timesteps 1_000_000_000 \
     --sweep-id pp976ug7 >& nohup.out &
 
 with `get_best_generic_params` and `get_best_rnd_config_provisional` and SPARSER VERSION:
-nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
+nohup poetry run python -m curemix.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
     --method grid  --enable-inner-wandb --fixed-override video_num_episodes=3 --total-timesteps 200_000_000 \
     --fixed-override procedural_generation=False >& nohup.out &
 
-nohup poetry run python -m crew.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
+nohup poetry run python -m curemix.experiments.wandb_hp_search --tuning-phase intrinsic --intrinsic-modules rnd \
     --method grid  --enable-inner-wandb --fixed-override video_num_episodes=3 --total-timesteps 200_000_000 \
     --fixed-override procedural_generation=False --fixed-override rnd.encoder_mode=inventory_only >& nohup.out &
 """

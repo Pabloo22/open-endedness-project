@@ -67,20 +67,20 @@ class TestMainAlgoMainLoopTiming(unittest.TestCase):
         config = _build_test_config(is_timing_run=False)
 
         with (
-            mock.patch("crew.main_algo.main_loop.jax.jit", side_effect=lambda fn: fn),
+            mock.patch("curemix.main_algo.main_loop.jax.jit", side_effect=lambda fn: fn),
             mock.patch(
-                "crew.main_algo.main_loop.jax.block_until_ready",
+                "curemix.main_algo.main_loop.jax.block_until_ready",
                 side_effect=lambda x: x,
             ) as block_until_ready_mock,
-            mock.patch("crew.main_algo.main_loop.train_one_iteration", side_effect=_fake_train_one_iteration),
+            mock.patch("curemix.main_algo.main_loop.train_one_iteration", side_effect=_fake_train_one_iteration),
             mock.patch(
-                "crew.main_algo.main_loop.evaluate_policy_on_alphas", side_effect=_fake_evaluate_policy_on_alphas
+                "curemix.main_algo.main_loop.evaluate_policy_on_alphas", side_effect=_fake_evaluate_policy_on_alphas
             ),
-            mock.patch("crew.main_algo.main_loop.infer_achievement_names", return_value=("Achievements/a",)),
-            mock.patch("crew.main_algo.main_loop.init_wandb_run", return_value=None),
-            mock.patch("crew.main_algo.main_loop.finish_wandb_run"),
-            mock.patch("crew.main_algo.main_loop.log_outer_batch_to_wandb"),
-            mock.patch("crew.main_algo.main_loop.time.perf_counter", side_effect=[10.0, 12.0]),
+            mock.patch("curemix.main_algo.main_loop.infer_achievement_names", return_value=("Achievements/a",)),
+            mock.patch("curemix.main_algo.main_loop.init_wandb_run", return_value=None),
+            mock.patch("curemix.main_algo.main_loop.finish_wandb_run"),
+            mock.patch("curemix.main_algo.main_loop.log_outer_batch_to_wandb"),
+            mock.patch("curemix.main_algo.main_loop.time.perf_counter", side_effect=[10.0, 12.0]),
             mock.patch("builtins.print") as print_mock,
         ):
             output = full_training(
@@ -112,21 +112,21 @@ class TestMainAlgoMainLoopTiming(unittest.TestCase):
         config = _build_test_config(is_timing_run=True)
 
         with (
-            mock.patch("crew.main_algo.main_loop.jax.jit", side_effect=lambda fn: fn),
+            mock.patch("curemix.main_algo.main_loop.jax.jit", side_effect=lambda fn: fn),
             mock.patch(
-                "crew.main_algo.main_loop.jax.block_until_ready",
+                "curemix.main_algo.main_loop.jax.block_until_ready",
                 side_effect=lambda x: x,
             ) as block_until_ready_mock,
-            mock.patch("crew.main_algo.main_loop.train_one_iteration", side_effect=_fake_train_one_iteration),
+            mock.patch("curemix.main_algo.main_loop.train_one_iteration", side_effect=_fake_train_one_iteration),
             mock.patch(
-                "crew.main_algo.main_loop.evaluate_policy_on_alphas", side_effect=_fake_evaluate_policy_on_alphas
+                "curemix.main_algo.main_loop.evaluate_policy_on_alphas", side_effect=_fake_evaluate_policy_on_alphas
             ),
-            mock.patch("crew.main_algo.main_loop.infer_achievement_names", return_value=("Achievements/a",)),
-            mock.patch("crew.main_algo.main_loop.init_wandb_run", return_value=None),
-            mock.patch("crew.main_algo.main_loop.finish_wandb_run"),
-            mock.patch("crew.main_algo.main_loop.log_outer_batch_to_wandb"),
+            mock.patch("curemix.main_algo.main_loop.infer_achievement_names", return_value=("Achievements/a",)),
+            mock.patch("curemix.main_algo.main_loop.init_wandb_run", return_value=None),
+            mock.patch("curemix.main_algo.main_loop.finish_wandb_run"),
+            mock.patch("curemix.main_algo.main_loop.log_outer_batch_to_wandb"),
             mock.patch(
-                "crew.main_algo.main_loop.time.perf_counter",
+                "curemix.main_algo.main_loop.time.perf_counter",
                 side_effect=[10.0, 12.0, 20.0, 23.0, 30.0, 31.0, 40.0, 41.0],
             ),
             mock.patch("builtins.print") as print_mock,

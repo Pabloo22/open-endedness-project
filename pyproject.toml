@@ -1,12 +1,12 @@
 [tool.poetry]
-name = "crew"
+name = "curemix"
 version = "0.1.0"
 description = "Curriculum for Reward Weighting"
 authors = ["Pablo Ariño <pablo.fernandez.25@ucl.ac.uk>"]
 license = "MIT"
 readme = "README.md"
 packages = [
-  { include = "crew", from = "src" }
+  { include = "curemix", from = "src" }
 ]
 
 [tool.poetry.dependencies]

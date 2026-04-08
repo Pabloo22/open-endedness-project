@@ -1,6 +1,6 @@
 # Hyperparameter Tuning Guide
 
-This guide documents the current workflow used by `src/crew/experiments/wandb_hp_search.py` and the `src/crew/experiments/tuning_configs/` package.
+This guide documents the current workflow used by `src/curemix/experiments/wandb_hp_search.py` and the `src/curemix/experiments/tuning_configs/` package.
 
 ## 1) What this script does
 
@@ -22,7 +22,7 @@ Important implementation detail: base tuning presets set `enable_wandb=False`, s
 Create + run random search (100 trials):
 
 ```bash
-poetry run python -m crew.experiments.wandb_hp_search \
+poetry run python -m curemix.experiments.wandb_hp_search \
   --tuning-phase generic \
   --count 100
 ```
@@ -30,7 +30,7 @@ poetry run python -m crew.experiments.wandb_hp_search \
 Create sweep only (no agent/trials):
 
 ```bash
-poetry run python -m crew.experiments.wandb_hp_search \
+poetry run python -m curemix.experiments.wandb_hp_search \
   --tuning-phase intrinsic \
   --intrinsic-modules rnd \
   --create-only
@@ -39,7 +39,7 @@ poetry run python -m crew.experiments.wandb_hp_search \
 Reuse an existing sweep id:
 
 ```bash
-poetry run python -m crew.experiments.wandb_hp_search \
+poetry run python -m curemix.experiments.wandb_hp_search \
   --tuning-phase curriculum \
   --intrinsic-modules rnd \
   --sweep-id <entity/project/sweep_id>
@@ -48,7 +48,7 @@ poetry run python -m crew.experiments.wandb_hp_search \
 Run grid search:
 
 ```bash
-poetry run python -m crew.experiments.wandb_hp_search \
+poetry run python -m curemix.experiments.wandb_hp_search \
   --tuning-phase generic \
   --method grid
 ```
@@ -56,7 +56,7 @@ poetry run python -m crew.experiments.wandb_hp_search \
 With fixed overrides before sweep sampling:
 
 ```bash
-poetry run python -m crew.experiments.wandb_hp_search \
+poetry run python -m curemix.experiments.wandb_hp_search \
   --tuning-phase intrinsic \
   --intrinsic-modules rnd \
   --fixed-override num_envs_per_batch=512 \
@@ -87,7 +87,7 @@ poetry run python -m crew.experiments.wandb_hp_search \
 
 ## 4) How the tuning config package is organized
 
-`src/crew/experiments/tuning_configs/` contains:
+`src/curemix/experiments/tuning_configs/` contains:
 - Versioned presets/search spaces per phase (`_generic_phase.py`, `_rnd_phase.py`, `_icm_phase.py`, `_ngu_phase.py`, `_curriculum_phase.py`).
 - Active aliases in `_active_configs.py`.
 - Public exports in `__init__.py`.
@@ -104,7 +104,7 @@ Example reward name below: `icm`.
 
 ### Step A — Add module implementation and registry wiring
 
-1. Implement module API under `src/crew/main_algo/intrinsic_modules/`.
+1. Implement module API under `src/curemix/main_algo/intrinsic_modules/`.
    - Follow `IntrinsicModule` protocol in `intrinsic_modules/api.py`.
 2. Register the module in `intrinsic_modules/registry.py`:
    - Import your module class.
@@ -115,14 +115,14 @@ Without this, `TrainConfig.selected_intrinsic_modules` validation fails.
 ### Step B — Add config support in `TrainConfig`
 
 If your module needs nested config fields (like `rnd.*`), add:
-- A dataclass for module hyperparameters in `src/crew/main_algo/config.py`.
+- A dataclass for module hyperparameters in `src/curemix/main_algo/config.py`.
 - A new field in `TrainConfig` (e.g. `icm: ICMConfig = field(default_factory=ICMConfig)`).
 - Validation logic in `_validate_selected_module_configs`.
 - Module-specific discount/lambda behavior if needed when building per-reward vectors.
 
 ### Step C — Add phase tuning file
 
-Create a new file in `src/crew/experiments/tuning_configs/` named:
+Create a new file in `src/curemix/experiments/tuning_configs/` named:
 - `_icm_phase.py` (pattern: `_{reward_name}_phase.py`)
 
 Add at least:
@@ -131,7 +131,7 @@ Add at least:
 
 ### Step D — Activate the new module in tuning presets
 
-Update `src/crew/experiments/tuning_configs/_active_configs.py`:
+Update `src/curemix/experiments/tuning_configs/_active_configs.py`:
 - Import your new phase functions.
 - Add active intrinsic base config entry in `ACTIVE_INTRINSIC_BASE_CONFIGS`.
 - Add active intrinsic search space entry in `ACTIVE_INTRINSIC_SEARCH_SPACES`.
@@ -143,7 +143,7 @@ Notes:
 
 ### Step E — Export from `tuning_configs/__init__.py`
 
-Update `src/crew/experiments/tuning_configs/__init__.py`:
+Update `src/curemix/experiments/tuning_configs/__init__.py`:
 - Import new `get_*_base_config_v1` / `get_*_search_space_v1` symbols.
 - Add them to `__all__` if meant to be public.
 
@@ -153,7 +153,7 @@ Once module is registered and active configs are wired:
 - Intrinsic phase:
 
 ```bash
-poetry run python -m crew.experiments.wandb_hp_search \
+poetry run python -m curemix.experiments.wandb_hp_search \
   --tuning-phase intrinsic \
   --intrinsic-modules icm
 ```
@@ -161,7 +161,7 @@ poetry run python -m crew.experiments.wandb_hp_search \
 - Curriculum with multiple modules:
 
 ```bash
-poetry run python -m crew.experiments.wandb_hp_search \
+poetry run python -m curemix.experiments.wandb_hp_search \
   --tuning-phase curriculum \
   --intrinsic-modules rnd icm
 ```
@@ -216,7 +216,7 @@ poetry run python -m crew.experiments.wandb_hp_search \
    This matches `TrainConfig` supported modes and is required for valid config construction.
 
 9. **`icm` and `ngu` tuning presets exist, but runtime still depends on module registration.**
-   If `icm`/`ngu` are not registered in `src/crew/main_algo/intrinsic_modules/registry.py`, trials using them will fail validation.
+   If `icm`/`ngu` are not registered in `src/curemix/main_algo/intrinsic_modules/registry.py`, trials using them will fail validation.
 
 10. **Sweep objective logged by this script:**
    - Primary objective: `tuning/objective_eval_return_mean`
