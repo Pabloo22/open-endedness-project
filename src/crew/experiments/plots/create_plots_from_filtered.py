@@ -12,8 +12,6 @@ from crew.experiments.plots.plot_functions import (
     plot_4_contour_overlay,
     plot_4_b,
     plot_4_c,
-    plot_5_heatmaps,
-    plot_6_learning_curves,
 )
 
 # ==========================================
@@ -76,8 +74,6 @@ if __name__ == "__main__":
         plot_4_contour_overlay(df, str(achievement_images_dir), achievement_filter=selected_achievement)
         plot_4_b(df, str(achievement_images_dir), achievement_filter=selected_achievement)
         plot_4_c(df, str(achievement_images_dir), achievement_filter=selected_achievement)
-        plot_5_heatmaps(df, str(achievement_images_dir), achievement_filter=selected_achievement)
-        plot_6_learning_curves(df, str(achievement_images_dir), achievement_filter=selected_achievement)
 
         plt.close("all")
 

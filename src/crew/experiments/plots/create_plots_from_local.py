@@ -52,8 +52,6 @@ from crew.experiments.plots.plot_functions import (
     plot_2_learning_curves,
     plot_2_b_learning_curves,
     plot_3_curriculum_adaptation,
-    plot_5_heatmaps,
-    plot_6_learning_curves,
 )
 
 # ==========================================

@@ -151,11 +151,15 @@ def _plot_heatmaps_base(
     cmap.set_bad("white")
 
     plot_configs = [
-        (grid_fixed, mask_invalid_fixed, f"{prefix}_heatmap_fixed_{achievement_filter}.pdf"),
-        (grid_curr, mask_invalid_curr, f"{prefix}_heatmap_curriculum_{achievement_filter}.pdf"),
+        (grid_fixed, mask_invalid_fixed, f"{prefix}_heatmap_fixed_{achievement_filter}.pdf", False),
+        (grid_curr, mask_invalid_curr, f"{prefix}_heatmap_curriculum_{achievement_filter}.pdf", True),
     ]
 
-    for grid, mask, filename in plot_configs:
+    apply_plot_1_customization = prefix == "plot_1"
+    show_icm_label = (achievement_filter == "collect_iron") if apply_plot_1_customization else True
+    show_colorbar = (achievement_filter == "place_furnace+make_iron_pickaxe") if apply_plot_1_customization else True
+
+    for grid, mask, filename, is_curriculum in plot_configs:
         fig, ax = plt.subplots()
         ax.set_facecolor("lightgray")
 
@@ -168,7 +172,8 @@ def _plot_heatmaps_base(
             vmax=max_score,
             xticklabels=grid_indices,
             yticklabels=grid_indices,
-            cbar_kws={"label": cbar_label},
+            cbar=show_colorbar,
+            cbar_kws={"label": cbar_label} if show_colorbar else None,
             annot_kws={"fontsize": 6},
             ax=ax,
             alpha=0.8,
@@ -188,8 +193,9 @@ def _plot_heatmaps_base(
             rasterized=True,
         )
 
-        ax.set_xlabel("RND weight")
-        ax.set_ylabel("ICM weight")
+        hide_curriculum_rnd_label = apply_plot_1_customization and is_curriculum
+        ax.set_xlabel("" if hide_curriculum_rnd_label else "RND weight")
+        ax.set_ylabel("ICM weight" if show_icm_label else "")
         ax.tick_params(left=False, bottom=False)
         ax.tick_params(axis="x", rotation=45)
         ax.invert_yaxis()
@@ -210,20 +216,6 @@ def plot_1_heatmaps(df, save_dir, achievement_filter="place_furnace+make_iron_pi
         metric_col="final_performance",
         prefix="plot_1",
         cbar_label="Mean final return",
-        max_score=max_score,
-        achievement_filter=achievement_filter,
-        grid_size=grid_size,
-    )
-
-
-def plot_5_heatmaps(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe", grid_size=8):
-    max_score = 22.0  # Assuming 22 total achievements possible in Craftax classic
-    _plot_heatmaps_base(
-        df,
-        save_dir,
-        metric_col="final_achievements",
-        prefix="plot_5",
-        cbar_label="Mean final achievements",
         max_score=max_score,
         achievement_filter=achievement_filter,
         grid_size=grid_size,
@@ -488,17 +480,6 @@ def plot_2_b_learning_curves(
     save_path = os.path.join(save_dir, f"{prefix}_learning_curves_{achievement_filter}.pdf")
     plt.savefig(save_path, format="pdf", bbox_inches="tight")
     print(f"Saved {prefix.replace('_', ' ').title()} to {save_path}")
-
-
-def plot_6_learning_curves(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe"):
-    _plot_learning_curves_base(
-        df,
-        save_dir,
-        achievement_filter,
-        metric_col="achievements_mean",
-        prefix="plot_6",
-        ylabel="Total achievements (mean)",
-    )
 
 
 def plot_3_curriculum_adaptation(
