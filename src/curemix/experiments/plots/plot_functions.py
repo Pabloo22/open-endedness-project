@@ -461,9 +461,10 @@ def _plot_learning_curves_base(df, save_dir, achievement_filter, metric_col, pre
         ax.legend(loc=loc, frameon=False, fontsize=LABEL_FONTSIZE)
 
     # Save the figure as a PDF
+    weights_str = f"ICM_{best_fixed_weights[0]}_RND_{best_fixed_weights[1]}" if best_fixed_weights else "no_fixed"
     save_path = os.path.join(
         save_dir,
-        f"{prefix}_learning_curves_{achievement_filter}_ICM_{best_fixed_weights[0]}_RND_{best_fixed_weights[1]}.pdf",
+        f"{prefix}_learning_curves_{achievement_filter}_{weights_str}.pdf",
     )
     plt.savefig(save_path, format="pdf", bbox_inches="tight")
     print(f"Saved {prefix.replace('_', ' ').title()} to {save_path}")
