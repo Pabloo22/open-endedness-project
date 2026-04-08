@@ -116,36 +116,8 @@ def _plot_heatmaps_base(
     achievement_filter="place_furnace+make_iron_pickaxe",
     grid_size=8,
 ):
-    step = 1.0 / grid_size
-    grid_indices = np.round(np.arange(0, 0.875 + step / 2, step), 3)
-    grid_dim = len(grid_indices)
-
-    def create_grid(run_type):
-        grid = np.full((grid_dim, grid_dim), np.nan)
-        mask_invalid = np.zeros((grid_dim, grid_dim), dtype=bool)
-
-        subset = df[df["run_type"] == run_type]
-        if subset.empty or metric_col not in subset.columns:
-            return grid, mask_invalid
-
-        grouped = subset.groupby(["icm_weight", "rnd_weight"])[metric_col].mean().reset_index()
-
-        for i, icm in enumerate(grid_indices):
-            for j, rnd in enumerate(grid_indices):
-                # allow a bit of floating point tolerance for the max sum which is 0.9
-                if round(icm + rnd, 3) > 0.9:
-                    mask_invalid[i, j] = True
-                else:
-                    match = grouped[
-                        (np.isclose(grouped["icm_weight"], icm, atol=1e-3))
-                        & (np.isclose(grouped["rnd_weight"], rnd, atol=1e-3))
-                    ]
-                    if not match.empty:
-                        grid[i, j] = match[metric_col].values[0]
-        return grid, mask_invalid
-
-    grid_fixed, mask_invalid_fixed = create_grid("baseline")
-    grid_curr, mask_invalid_curr = create_grid("curriculum")
+    grid_fixed, mask_invalid_fixed, grid_indices = _build_plot_1_grid(df, metric_col, "baseline", grid_size)
+    grid_curr, mask_invalid_curr, _ = _build_plot_1_grid(df, metric_col, "curriculum", grid_size)
 
     cmap = sns.color_palette("cividis", as_cmap=True)
     cmap.set_bad("white")
@@ -206,6 +178,151 @@ def _plot_heatmaps_base(
         save_path = os.path.join(save_dir, filename)
         plt.savefig(save_path, format="pdf", bbox_inches="tight")
         print(f"Saved heatmap to {save_path}")
+
+
+def _build_plot_1_grid(df, metric_col, run_type, grid_size):
+    """Build a Plot 1 heatmap grid and invalid-cell mask for a given run type."""
+    step = 1.0 / grid_size
+    grid_indices = np.round(np.arange(0, 0.875 + step / 2, step), 3)
+    grid_dim = len(grid_indices)
+
+    grid = np.full((grid_dim, grid_dim), np.nan)
+    mask_invalid = np.zeros((grid_dim, grid_dim), dtype=bool)
+
+    subset = df[df["run_type"] == run_type]
+    if subset.empty or metric_col not in subset.columns:
+        return grid, mask_invalid, grid_indices
+
+    grouped = subset.groupby(["icm_weight", "rnd_weight"])[metric_col].mean().reset_index()
+
+    for i, icm in enumerate(grid_indices):
+        for j, rnd in enumerate(grid_indices):
+            # allow a bit of floating point tolerance for the max sum which is 0.9
+            if round(icm + rnd, 3) > 0.9:
+                mask_invalid[i, j] = True
+            else:
+                match = grouped[
+                    (np.isclose(grouped["icm_weight"], icm, atol=1e-3))
+                    & (np.isclose(grouped["rnd_weight"], rnd, atol=1e-3))
+                ]
+                if not match.empty:
+                    grid[i, j] = match[metric_col].values[0]
+
+    return grid, mask_invalid, grid_indices
+
+
+def _format_achievement_name_for_title(achievement_name):
+    return achievement_name.replace("_", " ").replace("+", " & ")
+
+
+def plot_1_combined_heatmaps(achievement_dfs, save_dir, grid_size=8, filename="plot_1_combined_heatmaps.pdf"):
+    """Create a single Plot 1 figure across achievements with shared labels and one colorbar."""
+    if not achievement_dfs:
+        print("Warning: No achievement data provided for combined Plot 1 figure.")
+        return
+
+    achievement_names = sorted(achievement_dfs.keys())
+    num_achievements = len(achievement_names)
+    run_types = [("baseline", "Fixed weights"), ("curriculum", "CuReMix (Ours)")]
+
+    fig_width = max(6.8, 2.0 * num_achievements + 0.6)
+    fig_height = 4.5
+    fig = plt.figure(figsize=(fig_width, fig_height))
+    gs = fig.add_gridspec(
+        nrows=len(run_types),
+        ncols=num_achievements + 1,
+        width_ratios=[1] * num_achievements + [0.06],
+        wspace=0.08,
+        hspace=0.1,
+    )
+
+    axes = np.empty((len(run_types), num_achievements), dtype=object)
+    shared_ax = None
+    for row_idx in range(len(run_types)):
+        for col_idx in range(num_achievements):
+            if shared_ax is None:
+                ax = fig.add_subplot(gs[row_idx, col_idx])
+                shared_ax = ax
+            else:
+                ax = fig.add_subplot(gs[row_idx, col_idx], sharex=shared_ax, sharey=shared_ax)
+            axes[row_idx, col_idx] = ax
+
+    cax = fig.add_subplot(gs[:, -1])
+
+    cmap = sns.color_palette("cividis", as_cmap=True)
+    cmap.set_bad("white")
+
+    for col_idx, achievement in enumerate(achievement_names):
+        df = achievement_dfs[achievement]
+        max_score = len(achievement.split("+")) if achievement else 1.0
+        max_score = max(max_score, 1.0)
+        title_name = _format_achievement_name_for_title(achievement)
+
+        for row_idx, (run_type, _) in enumerate(run_types):
+            ax = axes[row_idx, col_idx]
+            grid, mask_invalid, grid_indices = _build_plot_1_grid(df, "final_performance", run_type, grid_size)
+            grid_pct = (grid / max_score) * 100.0
+
+            ax.set_facecolor("lightgray")
+            sns.heatmap(
+                grid_pct,
+                cmap=cmap,
+                annot=True,
+                fmt=".0f",
+                vmin=0.0,
+                vmax=100.0,
+                xticklabels=grid_indices,
+                yticklabels=grid_indices,
+                cbar=False,
+                annot_kws={"fontsize": 6},
+                ax=ax,
+                alpha=0.8,
+                linewidths=0,
+                rasterized=True,
+            )
+
+            sns.heatmap(
+                mask_invalid,
+                mask=~mask_invalid,
+                cmap=ListedColormap(["black"]),
+                cbar=False,
+                xticklabels=grid_indices,
+                yticklabels=grid_indices,
+                ax=ax,
+                linewidths=0,
+                rasterized=True,
+            )
+
+            ax.tick_params(left=False, bottom=False)
+            ax.tick_params(axis="x", rotation=45)
+            if row_idx < len(run_types) - 1:
+                ax.tick_params(labelbottom=False)
+            if col_idx > 0:
+                ax.tick_params(labelleft=False)
+            ax.invert_yaxis()
+
+            ax.set_xlabel("")
+            ax.set_ylabel("")
+
+            if row_idx == 0:
+                ax.set_title(title_name, fontsize=8)
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0.0, vmax=100.0))
+    sm.set_array([])
+    cbar = fig.colorbar(sm, cax=cax)
+    cbar.set_label("Return (% of max)")
+
+    fig.text(0.06, 0.69, run_types[0][1], rotation=90, va="center", ha="center", fontsize=8, fontweight="bold")
+    fig.text(0.06, 0.27, run_types[1][1], rotation=90, va="center", ha="center", fontsize=8, fontweight="bold")
+
+    fig.supxlabel("RND weight")
+    fig.supylabel("ICM weight", x=0.02)
+    fig.subplots_adjust(left=0.12, right=0.95, top=0.9, bottom=0.12)
+
+    save_path = os.path.join(save_dir, filename)
+    fig.savefig(save_path, format="pdf", bbox_inches="tight")
+    print(f"Saved combined Plot 1 heatmaps to {save_path}")
+    plt.close(fig)
 
 
 def plot_1_heatmaps(df, save_dir, achievement_filter="place_furnace+make_iron_pickaxe", grid_size=8):
@@ -480,6 +597,286 @@ def plot_2_b_learning_curves(
     save_path = os.path.join(save_dir, f"{prefix}_learning_curves_{achievement_filter}.pdf")
     plt.savefig(save_path, format="pdf", bbox_inches="tight")
     print(f"Saved {prefix.replace('_', ' ').title()} to {save_path}")
+
+
+def plot_2_combined_learning_curves(
+    achievement_dfs,
+    save_dir,
+    filename="plot_2_combined_learning_curves.pdf",
+):
+    """Create one figure with Plot 2 (top row) and Plot 2b (bottom row) across achievements."""
+    if not achievement_dfs:
+        print("Warning: No achievement data provided for combined Plot 2 figure.")
+        return
+
+    metric_col = "standardized_return_mean"
+    final_metric_col = "final_performance"
+
+    achievement_names = sorted(achievement_dfs.keys())
+    num_achievements = len(achievement_names)
+
+    def _percent_of_max(values, max_score):
+        return (values / max_score) * 100.0
+
+    def _best_fixed_subset(df):
+        fixed_search_df = df[(df["run_type"] == "baseline") & ~((df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0))]
+        if fixed_search_df.empty:
+            return None
+
+        mean_perfs = fixed_search_df.groupby(["icm_weight", "rnd_weight"])[final_metric_col].mean().reset_index()
+        if mean_perfs.empty:
+            return None
+
+        max_perf = mean_perfs[final_metric_col].max()
+        candidates = mean_perfs[mean_perfs[final_metric_col] >= max_perf - 0.02]
+
+        best_metric = -np.inf
+        best_weights = None
+        for _, row in candidates.iterrows():
+            icm, rnd = row["icm_weight"], row["rnd_weight"]
+            cand_df = fixed_search_df[(fixed_search_df["icm_weight"] == icm) & (fixed_search_df["rnd_weight"] == rnd)]
+            histories = pd.concat(cand_df["history"].tolist())
+            if metric_col not in histories.columns:
+                continue
+            auc_surrogate = histories[metric_col].mean()
+            if auc_surrogate > best_metric:
+                best_metric = auc_surrogate
+                best_weights = (icm, rnd)
+
+        if best_weights is None:
+            return None
+
+        return fixed_search_df[
+            (fixed_search_df["icm_weight"] == best_weights[0]) & (fixed_search_df["rnd_weight"] == best_weights[1])
+        ]
+
+    def _stats_from_subset(subset_df):
+        if subset_df is None or subset_df.empty:
+            return None
+        histories = pd.concat(subset_df["history"].tolist())
+        if metric_col not in histories.columns:
+            return None
+        histories["eval/total_steps"] = histories["eval/total_steps"].round(decimals=-4)
+        return histories.groupby("eval/total_steps")[metric_col].agg(["mean", "min", "max"]).reset_index()
+
+    prepared = {}
+
+    quintile_colors = sns.color_palette("rocket", 5)
+    quintile_labels = [
+        "Top 0-20%",
+        "Top 20-40%",
+        "Top 40-60%",
+        "Top 60-80%",
+        "Top 80-100%",
+    ]
+
+    for achievement in achievement_names:
+        df = achievement_dfs[achievement]
+        max_score = max(float(len(achievement.split("+"))) if achievement else 1.0, 1.0)
+        achievement_max_steps = 0
+
+        top_curves = []
+        bottom_curves = []
+
+        # Top row: Plot 2 curves.
+        ext_only_df = df[(df["run_type"] == "baseline") & (df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0)]
+        ext_stats = _stats_from_subset(ext_only_df)
+        if ext_stats is not None and not ext_stats.empty:
+            top_curves.append(
+                {
+                    "label": "Extrinsic only",
+                    "color": "#56B4E9",
+                    "x": ext_stats["eval/total_steps"],
+                    "mean": _percent_of_max(ext_stats["mean"], max_score),
+                    "lower": _percent_of_max(ext_stats["min"], max_score),
+                    "upper": _percent_of_max(ext_stats["max"], max_score),
+                }
+            )
+            achievement_max_steps = max(achievement_max_steps, float(ext_stats["eval/total_steps"].max()))
+
+        best_fixed_df = _best_fixed_subset(df)
+        best_fixed_stats = _stats_from_subset(best_fixed_df)
+        if best_fixed_stats is not None and not best_fixed_stats.empty:
+            top_curves.append(
+                {
+                    "label": "Best fixed weights",
+                    "color": "#E69F00",
+                    "x": best_fixed_stats["eval/total_steps"],
+                    "mean": _percent_of_max(best_fixed_stats["mean"], max_score),
+                    "lower": _percent_of_max(best_fixed_stats["min"], max_score),
+                    "upper": _percent_of_max(best_fixed_stats["max"], max_score),
+                }
+            )
+            achievement_max_steps = max(achievement_max_steps, float(best_fixed_stats["eval/total_steps"].max()))
+
+        curr_search_df = df[df["run_type"] == "curriculum"]
+        best_curr_stats = _get_curemix_stats(curr_search_df, metric_col)
+        if best_curr_stats is not None and not best_curr_stats.empty:
+            top_curves.append(
+                {
+                    "label": "CuReMix (Ours)",
+                    "color": "#009E73",
+                    "x": best_curr_stats["eval/total_steps"],
+                    "mean": _percent_of_max(best_curr_stats["mean"], max_score),
+                    "lower": _percent_of_max(best_curr_stats["min"], max_score),
+                    "upper": _percent_of_max(best_curr_stats["max"], max_score),
+                }
+            )
+            achievement_max_steps = max(achievement_max_steps, float(best_curr_stats["eval/total_steps"].max()))
+
+        # Bottom row: Plot 2b curves.
+        fixed_search_df = df[(df["run_type"] == "baseline") & ~((df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0))]
+        if not fixed_search_df.empty:
+            mean_perfs = fixed_search_df.groupby(["icm_weight", "rnd_weight"])[final_metric_col].mean().reset_index()
+            mean_perfs = mean_perfs.sort_values(by=final_metric_col, ascending=False).reset_index(drop=True)
+
+            indices_list = np.array_split(np.arange(len(mean_perfs)), 5)
+            quintiles = [mean_perfs.iloc[indices] for indices in indices_list if len(indices) > 0]
+
+            for q_idx, quintile_df in enumerate(quintiles):
+                q_histories = []
+                for _, row in quintile_df.iterrows():
+                    icm, rnd = row["icm_weight"], row["rnd_weight"]
+                    cand_df = fixed_search_df[
+                        (fixed_search_df["icm_weight"] == icm) & (fixed_search_df["rnd_weight"] == rnd)
+                    ]
+                    q_histories.extend(cand_df["history"].tolist())
+
+                if not q_histories:
+                    continue
+
+                histories = pd.concat(q_histories)
+                if metric_col not in histories.columns:
+                    continue
+                histories["eval/total_steps"] = histories["eval/total_steps"].round(decimals=-4)
+                stats = (
+                    histories.groupby("eval/total_steps")[metric_col]
+                    .agg(mean="mean", std=lambda x: x.std(ddof=0), count="count")
+                    .reset_index()
+                )
+
+                sem = stats["std"] / np.sqrt(stats["count"].clip(lower=1))
+                ci_half_width = CI_95_Z * sem
+                lower_bound = np.maximum(stats["mean"] - ci_half_width, 0)
+                upper_bound = np.minimum(stats["mean"] + ci_half_width, max_score)
+
+                bottom_curves.append(
+                    {
+                        "label": quintile_labels[q_idx],
+                        "color": quintile_colors[q_idx],
+                        "x": stats["eval/total_steps"],
+                        "mean": _percent_of_max(stats["mean"], max_score),
+                        "lower": _percent_of_max(lower_bound, max_score),
+                        "upper": _percent_of_max(upper_bound, max_score),
+                    }
+                )
+                achievement_max_steps = max(achievement_max_steps, float(stats["eval/total_steps"].max()))
+
+        if best_curr_stats is not None and not best_curr_stats.empty:
+            bottom_curves.append(
+                {
+                    "label": "CuReMix (Ours)",
+                    "color": "#009E73",
+                    "x": best_curr_stats["eval/total_steps"],
+                    "mean": _percent_of_max(best_curr_stats["mean"], max_score),
+                    "lower": _percent_of_max(best_curr_stats["min"], max_score),
+                    "upper": _percent_of_max(best_curr_stats["max"], max_score),
+                }
+            )
+
+        prepared[achievement] = {
+            "top_curves": top_curves,
+            "bottom_curves": bottom_curves,
+            "max_steps": achievement_max_steps,
+        }
+
+    fig_width = max(6.8, 2.1 * num_achievements + 1.4)
+    fig_height = 4.8
+    fig, axes = plt.subplots(2, num_achievements, figsize=(fig_width, fig_height), sharex="col", sharey=True)
+
+    if num_achievements == 1:
+        axes = np.array([[axes[0]], [axes[1]]])
+
+    for col_idx, achievement in enumerate(achievement_names):
+        top_ax = axes[0, col_idx]
+        bottom_ax = axes[1, col_idx]
+        data = prepared[achievement]
+
+        for curve in data["top_curves"]:
+            _add_curve_to_axis(
+                top_ax,
+                curve["x"],
+                curve["mean"],
+                curve["lower"],
+                curve["upper"],
+                curve["label"],
+                curve["color"],
+                False,
+                None,
+            )
+
+        for curve in data["bottom_curves"]:
+            _add_curve_to_axis(
+                bottom_ax,
+                curve["x"],
+                curve["mean"],
+                curve["lower"],
+                curve["upper"],
+                curve["label"],
+                curve["color"],
+                False,
+                None,
+            )
+
+        title_name = _format_achievement_name_for_title(achievement)
+        top_ax.set_title(title_name, fontsize=8)
+
+        top_ax.grid(True, alpha=0.3)
+        bottom_ax.grid(True, alpha=0.3)
+
+        if col_idx > 0:
+            top_ax.tick_params(labelleft=False)
+            bottom_ax.tick_params(labelleft=False)
+
+    for col_idx, achievement in enumerate(achievement_names):
+        max_steps = prepared[achievement]["max_steps"]
+        if max_steps > 0:
+            axes[0, col_idx].set_xlim(0, max_steps)
+            axes[1, col_idx].set_xlim(0, max_steps)
+    for ax in axes.flat:
+        ax.set_ylim(0, 100)
+
+    legend_handles = []
+    legend_labels = []
+    for ax in axes.flat:
+        h, l = ax.get_legend_handles_labels()
+        for handle, label in zip(h, l):
+            if label not in legend_labels:
+                legend_labels.append(label)
+                legend_handles.append(handle)
+
+    if legend_handles:
+        legend_fontsize = max(LABEL_FONTSIZE + 2, 7)
+        fig.legend(
+            legend_handles,
+            legend_labels,
+            loc="upper center",
+            bbox_to_anchor=(0.5, 0.985),
+            ncol=len(legend_labels),
+            frameon=False,
+            fontsize=legend_fontsize,
+            handlelength=2.1,
+            columnspacing=1.0,
+        )
+
+    fig.supxlabel("Total environment steps")
+    fig.supylabel("Extrinsic return (% of max)", x=0.045)
+    fig.subplots_adjust(left=0.10, right=0.98, top=0.90, bottom=0.12, wspace=0.10, hspace=0.16)
+
+    save_path = os.path.join(save_dir, filename)
+    fig.savefig(save_path, format="pdf", bbox_inches="tight")
+    print(f"Saved combined Plot 2 figure to {save_path}")
+    plt.close(fig)
 
 
 def plot_3_curriculum_adaptation(
