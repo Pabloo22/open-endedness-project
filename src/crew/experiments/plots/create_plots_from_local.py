@@ -50,9 +50,8 @@ import pandas as pd
 from crew.experiments.plots.plot_functions import (
     plot_1_heatmaps,
     plot_2_learning_curves,
+    plot_2_b_learning_curves,
     plot_3_curriculum_adaptation,
-    plot_5_heatmaps,
-    plot_6_learning_curves,
 )
 
 # ==========================================
@@ -316,6 +315,7 @@ if __name__ == "__main__":
         # 2. You can now pass this `df` directly to the plotting functions from the previous script!
         plot_1_heatmaps(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
         plot_2_learning_curves(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
+        plot_2_b_learning_curves(df, "images", achievement_filter=ACHIEVEMENT_FILTER)
         plot_3_curriculum_adaptation(
             df,
             "images",
