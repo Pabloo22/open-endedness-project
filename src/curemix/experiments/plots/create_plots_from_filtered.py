@@ -65,15 +65,15 @@ if __name__ == "__main__":
         # print(f"{message} Creating plots in {achievement_images_dir}...")
 
         # One Plot 4-style 1x4 figure per achievement in images/
-        # plot_4_combined_training_stages(df, IMAGES_DIR, achievement_filter=selected_achievement)
+        plot_4_combined_training_stages(df, IMAGES_DIR, achievement_filter=selected_achievement)
 
-        # # One Plot 4-style 2x4 figure with sliding window alpha distribution per achievement in images/
-        # plot_4_combined_training_stages_sliding_window(
-        #     df,
-        #     IMAGES_DIR,
-        #     achievement_filter=selected_achievement,
-        #     window_size=SLIDING_WINDOW_SIZE,
-        # )
+        # One Plot 4-style 2x4 figure with sliding window alpha distribution per achievement in images/
+        plot_4_combined_training_stages_sliding_window(
+            df,
+            IMAGES_DIR,
+            achievement_filter=selected_achievement,
+            window_size=SLIDING_WINDOW_SIZE,
+        )
 
         # plot_1_heatmaps(df, str(achievement_images_dir), achievement_filter=selected_achievement)
         # plot_2_learning_curves(df, str(achievement_images_dir), achievement_filter=selected_achievement)

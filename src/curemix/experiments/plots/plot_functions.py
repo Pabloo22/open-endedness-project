@@ -149,6 +149,7 @@ def _plot_heatmaps_base(
             annot_kws={"fontsize": 6},
             ax=ax,
             alpha=0.8,
+            square=True,
             linewidths=0,
             rasterized=True,
         )
@@ -161,6 +162,7 @@ def _plot_heatmaps_base(
             xticklabels=grid_indices,
             yticklabels=grid_indices,
             ax=ax,
+            square=True,
             linewidths=0,
             rasterized=True,
         )
@@ -212,6 +214,11 @@ def _build_plot_1_grid(df, metric_col, run_type, grid_size):
 
 
 def _format_achievement_name_for_title(achievement_name):
+    parts = achievement_name.split("+") if achievement_name else []
+    if len(parts) == 2:
+        left = parts[0].replace("_", " ")
+        right = parts[1].replace("_", " ")
+        return f"{left}\n& {right}"
     return achievement_name.replace("_", " ").replace("+", " & ")
 
 
@@ -225,21 +232,21 @@ def plot_1_combined_heatmaps(achievement_dfs, save_dir, grid_size=8, filename="p
     num_achievements = len(achievement_names)
     run_types = [("baseline", "Fixed weights"), ("curriculum", "CuReMix (Ours)")]
 
-    fig_width = max(6.8, 2.0 * num_achievements + 0.6)
-    fig_height = 4.5
+    fig_width = 3.6
+    fig_height = max(4.0, 1.6 * num_achievements + 0.5)
     fig = plt.figure(figsize=(fig_width, fig_height))
     gs = fig.add_gridspec(
-        nrows=len(run_types),
-        ncols=num_achievements + 1,
-        width_ratios=[1] * num_achievements + [0.06],
-        wspace=0.08,
-        hspace=0.1,
+        nrows=num_achievements,
+        ncols=len(run_types) + 1,
+        width_ratios=[1, 1, 0.08],
+        wspace=0.1,
+        hspace=0.15,
     )
 
-    axes = np.empty((len(run_types), num_achievements), dtype=object)
+    axes = np.empty((num_achievements, len(run_types)), dtype=object)
     shared_ax = None
-    for row_idx in range(len(run_types)):
-        for col_idx in range(num_achievements):
+    for row_idx in range(num_achievements):
+        for col_idx in range(len(run_types)):
             if shared_ax is None:
                 ax = fig.add_subplot(gs[row_idx, col_idx])
                 shared_ax = ax
@@ -252,13 +259,13 @@ def plot_1_combined_heatmaps(achievement_dfs, save_dir, grid_size=8, filename="p
     cmap = sns.color_palette("cividis", as_cmap=True)
     cmap.set_bad("white")
 
-    for col_idx, achievement in enumerate(achievement_names):
+    for row_idx, achievement in enumerate(achievement_names):
         df = achievement_dfs[achievement]
         max_score = len(achievement.split("+")) if achievement else 1.0
         max_score = max(max_score, 1.0)
         title_name = _format_achievement_name_for_title(achievement)
 
-        for row_idx, (run_type, _) in enumerate(run_types):
+        for col_idx, (run_type, _) in enumerate(run_types):
             ax = axes[row_idx, col_idx]
             grid, mask_invalid, grid_indices = _build_plot_1_grid(df, "final_performance", run_type, grid_size)
             grid_pct = (grid / max_score) * 100.0
@@ -277,6 +284,7 @@ def plot_1_combined_heatmaps(achievement_dfs, save_dir, grid_size=8, filename="p
                 annot_kws={"fontsize": 6},
                 ax=ax,
                 alpha=0.8,
+                square=True,
                 linewidths=0,
                 rasterized=True,
             )
@@ -289,13 +297,14 @@ def plot_1_combined_heatmaps(achievement_dfs, save_dir, grid_size=8, filename="p
                 xticklabels=grid_indices,
                 yticklabels=grid_indices,
                 ax=ax,
+                square=True,
                 linewidths=0,
                 rasterized=True,
             )
 
             ax.tick_params(left=False, bottom=False)
             ax.tick_params(axis="x", rotation=45)
-            if row_idx < len(run_types) - 1:
+            if row_idx < num_achievements - 1:
                 ax.tick_params(labelbottom=False)
             if col_idx > 0:
                 ax.tick_params(labelleft=False)
@@ -305,19 +314,27 @@ def plot_1_combined_heatmaps(achievement_dfs, save_dir, grid_size=8, filename="p
             ax.set_ylabel("")
 
             if row_idx == 0:
-                ax.set_title(title_name, fontsize=8)
+                ax.set_title(run_types[col_idx][1], fontsize=8)
+            if col_idx == 0:
+                ax.text(
+                    -0.53,
+                    0.5,
+                    title_name,
+                    transform=ax.transAxes,
+                    rotation=90,
+                    va="center",
+                    ha="center",
+                    fontsize=8,
+                )
 
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0.0, vmax=100.0))
     sm.set_array([])
     cbar = fig.colorbar(sm, cax=cax)
     cbar.set_label("Return (% of max)")
 
-    fig.text(0.06, 0.69, run_types[0][1], rotation=90, va="center", ha="center", fontsize=8, fontweight="bold")
-    fig.text(0.06, 0.27, run_types[1][1], rotation=90, va="center", ha="center", fontsize=8, fontweight="bold")
-
-    fig.supxlabel("RND weight")
+    fig.supxlabel("RND weight", y=0.06)
     fig.supylabel("ICM weight", x=0.02)
-    fig.subplots_adjust(left=0.12, right=0.95, top=0.9, bottom=0.12)
+    fig.subplots_adjust(left=0.28, right=0.95, top=0.92, bottom=0.15)
 
     save_path = os.path.join(save_dir, filename)
     fig.savefig(save_path, format="pdf", bbox_inches="tight")
@@ -1369,6 +1386,7 @@ def _plot_4_base(
             annot_kws={"fontsize": 6},
             ax=ax,
             alpha=0.8,
+            square=True,
             linewidths=0,
             rasterized=True,
         )
@@ -1381,6 +1399,7 @@ def _plot_4_base(
             xticklabels=grid_indices,
             yticklabels=grid_indices,
             ax=ax,
+            square=True,
             linewidths=0,
             rasterized=True,
         )
