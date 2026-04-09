@@ -4,15 +4,17 @@
 ```bash
 .
 ├── LICENSE
-├── notebooks
-│   └── debugging.ipynb  # Used for data exploration and quick prototyping
 ├── poetry.lock
 ├── pyproject.toml
-├── CONTRIBUTING.md  # Collaboration guidelines for the project
 ├── README.md
+├── artifacts/filtered_results  # .csv files with the relevant data logged during training
 └── src
-    └── curemix  # Reusable code for the project. It has type-hints and docstrings.
+    └── curemix  # Reusable code for the project
         ├── __init__.py
+        └── experiments  # Subpackage used to run the experiments
+        └── hyp_tuning  # (not used in the final version of the paper)
+        └── main_algo  # Source code of our algorithm and the baselines
+            
 ```
 
 ## Installation
