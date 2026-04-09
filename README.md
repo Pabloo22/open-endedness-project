@@ -1,4 +1,4 @@
-# Merging Intrinsic and Extrinsic Rewards in Reinforcement Learning
+# Curriculum-Driven Exploration via Adaptive Pursuit of Learnable Reward Mixtures
 
 ## Repo Structure
 ```bash
