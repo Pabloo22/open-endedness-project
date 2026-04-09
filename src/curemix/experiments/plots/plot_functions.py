@@ -605,7 +605,7 @@ def plot_2_combined_learning_curves(
     save_dir,
     filename="plot_2_combined_learning_curves.pdf",
 ):
-    """Create one figure with Plot 2 (top row) and Plot 2b (bottom row) across achievements."""
+    """Create one 1xN figure with Plot 2 and Plot 2b curves overlaid per achievement."""
     if not achievement_dfs:
         print("Warning: No achievement data provided for combined Plot 2 figure.")
         return
@@ -791,21 +791,20 @@ def plot_2_combined_learning_curves(
             "max_steps": achievement_max_steps,
         }
 
-    fig_width = max(6.8, 2.1 * num_achievements + 1.4)
-    fig_height = 4.8
-    fig, axes = plt.subplots(2, num_achievements, figsize=(fig_width, fig_height), sharex="col", sharey=True)
+    fig_width = max(6.8, 2.1 * num_achievements + 1.0)
+    fig_height = 2.8
+    fig, axes = plt.subplots(1, num_achievements, figsize=(fig_width, fig_height), sharey=True)
 
     if num_achievements == 1:
-        axes = np.array([[axes[0]], [axes[1]]])
+        axes = np.array([axes])
 
     for col_idx, achievement in enumerate(achievement_names):
-        top_ax = axes[0, col_idx]
-        bottom_ax = axes[1, col_idx]
+        ax = axes[col_idx]
         data = prepared[achievement]
 
         for curve in data["top_curves"]:
             _add_curve_to_axis(
-                top_ax,
+                ax,
                 curve["x"],
                 curve["mean"],
                 curve["lower"],
@@ -818,7 +817,7 @@ def plot_2_combined_learning_curves(
 
         for curve in data["bottom_curves"]:
             _add_curve_to_axis(
-                bottom_ax,
+                ax,
                 curve["x"],
                 curve["mean"],
                 curve["lower"],
@@ -830,26 +829,23 @@ def plot_2_combined_learning_curves(
             )
 
         title_name = _format_achievement_name_for_title(achievement)
-        top_ax.set_title(title_name, fontsize=8)
-
-        top_ax.grid(True, alpha=0.3)
-        bottom_ax.grid(True, alpha=0.3)
+        ax.set_title(title_name, fontsize=8)
+        ax.grid(True, alpha=0.3)
 
         if col_idx > 0:
-            top_ax.tick_params(labelleft=False)
-            bottom_ax.tick_params(labelleft=False)
+            ax.tick_params(labelleft=False)
 
     for col_idx, achievement in enumerate(achievement_names):
         max_steps = prepared[achievement]["max_steps"]
         if max_steps > 0:
-            axes[0, col_idx].set_xlim(0, max_steps)
-            axes[1, col_idx].set_xlim(0, max_steps)
-    for ax in axes.flat:
+            axes[col_idx].set_xlim(0, max_steps)
+
+    for ax in axes:
         ax.set_ylim(0, 100)
 
     legend_handles = []
     legend_labels = []
-    for ax in axes.flat:
+    for ax in axes:
         h, l = ax.get_legend_handles_labels()
         for handle, label in zip(h, l):
             if label not in legend_labels:
@@ -861,8 +857,8 @@ def plot_2_combined_learning_curves(
         fig.legend(
             legend_handles,
             legend_labels,
-            loc="upper center",
-            bbox_to_anchor=(0.5, 0.985),
+            loc="lower center",
+            bbox_to_anchor=(0.5, 0.02),
             ncol=len(legend_labels),
             frameon=False,
             fontsize=legend_fontsize,
@@ -870,9 +866,9 @@ def plot_2_combined_learning_curves(
             columnspacing=1.0,
         )
 
-    fig.supxlabel("Total environment steps")
+    fig.supxlabel("Total environment steps", y=0.13)
     fig.supylabel("Extrinsic return (% of max)", x=0.045)
-    fig.subplots_adjust(left=0.10, right=0.98, top=0.90, bottom=0.12, wspace=0.10, hspace=0.16)
+    fig.subplots_adjust(left=0.10, right=0.98, top=0.84, bottom=0.33, wspace=0.10)
 
     save_path = os.path.join(save_dir, filename)
     fig.savefig(save_path, format="pdf", bbox_inches="tight")
@@ -1011,19 +1007,69 @@ def plot_3_combined_curriculum_adaptation(
     filename="plot_3_combined_curriculum_adaptation.pdf",
 ):
     """Create a single 1x4 Plot 3 figure with shared axes and external dual legends."""
+    return _plot_3_combined_curriculum_adaptation_layout(
+        achievement_dfs,
+        save_dir,
+        filename=filename,
+        layout="1x4",
+    )
+
+
+def plot_3_combined_curriculum_adaptation_2x2(
+    achievement_dfs,
+    save_dir,
+    filename="plot_3_combined_curriculum_adaptation_2x2.pdf",
+):
+    """Create a single 2x2 Plot 3 figure with shared axes and external dual legends."""
+    return _plot_3_combined_curriculum_adaptation_layout(
+        achievement_dfs,
+        save_dir,
+        filename=filename,
+        layout="2x2",
+    )
+
+
+def _plot_3_combined_curriculum_adaptation_layout(
+    achievement_dfs,
+    save_dir,
+    filename,
+    layout,
+):
+    """Internal helper to render combined Plot 3 in either 1x4 or 2x2 layout."""
     if not achievement_dfs:
         print("Warning: No achievement data provided for combined Plot 3 figure.")
         return
 
     achievement_names = sorted(achievement_dfs.keys())
-    max_cols = 4
+    if layout == "1x4":
+        nrows, ncols = 1, 4
+        fig_width, fig_height = 11.2, 3.3
+        left, right, top, bottom = 0.08, 0.94, 0.84, 0.20
+        wspace, hspace = 0.13, 0.00
+        left_label_x = 0.04
+        right_label_x = 0.985
+        legend_y = 0.965
+        xlabel_y = 0.0
+    elif layout == "2x2":
+        nrows, ncols = 2, 2
+        fig_width, fig_height = 6.2, 5.7
+        left, right, top, bottom = 0.10, 0.90, 0.88, 0.15
+        wspace, hspace = 0.20, 0.22
+        left_label_x = 0.03
+        right_label_x = 0.97
+        legend_y = 0.97
+        xlabel_y = 0.05
+    else:
+        raise ValueError(f"Unsupported plot 3 layout '{layout}'. Expected '1x4' or '2x2'.")
 
-    if len(achievement_names) > max_cols:
+    max_panels = nrows * ncols
+
+    if len(achievement_names) > max_panels:
         print(
             f"Warning: Received {len(achievement_names)} achievements for combined Plot 3; "
-            f"only first {max_cols} will be shown."
+            f"only first {max_panels} will be shown."
         )
-        achievement_names = achievement_names[:max_cols]
+        achievement_names = achievement_names[:max_panels]
 
     def _get_combined_stats(df, max_score):
         curr_df = df[(df["run_type"] == "curriculum") & (df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0)]
@@ -1095,10 +1141,8 @@ def plot_3_combined_curriculum_adaptation(
         if prepared[achievement] is not None:
             global_max_steps = max(global_max_steps, prepared[achievement]["max_steps"])
 
-    fig_width = 11.2
-    fig_height = 3.3
-    fig, axes = plt.subplots(1, max_cols, figsize=(fig_width, fig_height), sharex=False, sharey=True)
-    axes = np.atleast_1d(axes)
+    fig, axes = plt.subplots(nrows, ncols, figsize=(fig_width, fig_height), sharex=False, sharey=True)
+    axes = np.atleast_1d(axes).reshape(-1)
 
     legend_handles = []
     legend_labels = []
@@ -1110,16 +1154,16 @@ def plot_3_combined_curriculum_adaptation(
     ]
     perf_color = "#009E73"
 
-    for col_idx in range(max_cols):
-        ax = axes[col_idx]
+    for panel_idx in range(max_panels):
+        ax = axes[panel_idx]
         ax2 = ax.twinx()
 
-        if col_idx >= len(achievement_names):
+        if panel_idx >= len(achievement_names):
             ax.set_visible(False)
             ax2.set_visible(False)
             continue
 
-        achievement = achievement_names[col_idx]
+        achievement = achievement_names[panel_idx]
         title_name = _format_achievement_name_for_title(achievement)
         ax.set_title(title_name, fontsize=8)
 
@@ -1162,9 +1206,10 @@ def plot_3_combined_curriculum_adaptation(
         ax.set_ylim(0, 1.0)
         ax2.set_ylim(0, 100.0)
 
+        col_idx = panel_idx % ncols
         if col_idx > 0:
             ax.tick_params(labelleft=False)
-        if col_idx < max_cols - 1:
+        if col_idx < ncols - 1:
             ax2.tick_params(labelright=False)
 
         if data is not None and data["max_steps"] > 0:
@@ -1184,16 +1229,16 @@ def plot_3_combined_curriculum_adaptation(
                 legend_labels.append(label)
                 legend_handles.append(handle)
 
-    fig.supxlabel("Total environment steps")
-    fig.supylabel("Reward weights", x=0.04)
-    fig.text(0.985, 0.5, "Extrinsic return (% of max)", rotation=270, va="center", ha="center")
+    fig.supxlabel("Total environment steps", y=xlabel_y)
+    fig.supylabel("Reward weights", x=left_label_x)
+    fig.text(right_label_x, 0.5, "Extrinsic return (% of max)", rotation=270, va="center", ha="center")
 
     if legend_handles:
         fig.legend(
             legend_handles,
             legend_labels,
             loc="upper center",
-            bbox_to_anchor=(0.5, 0.965),
+            bbox_to_anchor=(0.5, legend_y),
             ncol=len(legend_labels),
             frameon=False,
             fontsize=max(LABEL_FONTSIZE + 3, 8),
@@ -1201,7 +1246,7 @@ def plot_3_combined_curriculum_adaptation(
             columnspacing=1.0,
         )
 
-    fig.subplots_adjust(left=0.08, right=0.94, top=0.84, bottom=0.20, wspace=0.13)
+    fig.subplots_adjust(left=left, right=right, top=top, bottom=bottom, wspace=wspace, hspace=hspace)
 
     save_path = os.path.join(save_dir, filename)
     fig.savefig(save_path, format="pdf", bbox_inches="tight")
@@ -1396,7 +1441,7 @@ def _plot_4_base(
         # If this is a pdf target, save to file
         for target_pct in pdf_pcts:
             if np.isclose(pct, target_pct):
-                filename = f"{prefix}_{int(pct*100)}pct_{achievement_filter}.pdf"
+                filename = f"{prefix}_{achievement_filter}.pdf"
                 save_path = os.path.join(save_dir, filename)
                 plt.savefig(save_path, format="pdf", bbox_inches="tight")
                 print(f"Saved {filename} to {save_path}")
@@ -1576,7 +1621,7 @@ def plot_4_combined_training_stages(
             )
 
             # Show contour values directly on the lines, as in the original Plot 4.
-            labels = ax.clabel(contours, inline=True, fontsize=5, fmt="%.1f")
+            labels = ax.clabel(contours, inline=True, fontsize=6, fmt="%.1f")
             plt.setp(labels, path_effects=[pe.withStroke(linewidth=black_line_width, foreground="black")])
 
             # Keep a direct label anchored near the top-right contour area.
@@ -1624,6 +1669,253 @@ def plot_4_combined_training_stages(
     save_path = os.path.join(save_dir, filename)
     fig.savefig(save_path, format="pdf", bbox_inches="tight")
     print(f"Saved combined Plot 4 figure to {save_path}")
+    plt.close(fig)
+
+
+def plot_4_combined_training_stages_sliding_window(
+    df,
+    save_dir,
+    achievement_filter="place_furnace+make_iron_pickaxe",
+    grid_size=8,
+    percentages=(0.125, 0.25, 0.375, 0.50, 0.625, 0.75, 0.875, 1.00),
+    window_size=0.05,
+):
+    """Create an 8-plot (2x4) figure showing training stages with sliding window alpha distribution.
+
+    For each percentage X, shows the distribution of alphas from (X-window_size)% to X% of training.
+    """
+    step = 1.0 / grid_size
+    grid_indices = np.round(np.arange(0, 0.875 + step / 2, step), 3)
+    grid_dim = len(grid_indices)
+
+    max_score = max(float(len(achievement_filter.split("+"))) if achievement_filter else 1.0, 1.0)
+    metric_col = "standardized_return_mean"
+
+    curr_eval_df = df[df["run_type"] == "curriculum"]
+    curr_df = df[(df["run_type"] == "curriculum") & (df["icm_weight"] == 0.0) & (df["rnd_weight"] == 0.0)]
+
+    if curr_eval_df.empty:
+        print("Warning: No curriculum data found for combined Plot 4 sliding window figure.")
+        return
+
+    max_eval_steps = 0
+    for _, row in curr_eval_df.iterrows():
+        hist = row.get("history")
+        if hist is not None and not hist.empty and "eval/total_steps" in hist.columns:
+            max_eval_steps = max(max_eval_steps, hist["eval/total_steps"].max())
+
+    if max_eval_steps == 0:
+        print("Warning: No evaluation steps found for combined Plot 4 sliding window figure.")
+        return
+
+    fig_width = 11.2
+    fig_height = 5.6
+    fig = plt.figure(figsize=(fig_width, fig_height))
+    gs = fig.add_gridspec(
+        nrows=2,
+        ncols=5,
+        width_ratios=[1, 1, 1, 1, 0.06],
+        wspace=0.03,
+        hspace=0.12,
+    )
+
+    axes = np.empty(8, dtype=object)
+    shared_ax = None
+    for idx in range(8):
+        row = idx // 4
+        col = idx % 4
+        if shared_ax is None:
+            ax = fig.add_subplot(gs[row, col])
+            shared_ax = ax
+        else:
+            ax = fig.add_subplot(gs[row, col], sharex=shared_ax, sharey=shared_ax)
+        axes[idx] = ax
+
+    cax = fig.add_subplot(gs[:, -1])
+
+    cmap = sns.color_palette("cividis", as_cmap=True)
+    cmap.set_bad("white")
+
+    for idx, pct in enumerate(percentages[:8]):
+        ax = axes[idx]
+        target_step = max_eval_steps * float(pct)
+        window_start_step = max(0, max_eval_steps * (float(pct) - window_size))
+
+        grid_pct = np.full((grid_dim, grid_dim), np.nan)
+        grid_freq = np.zeros((grid_dim, grid_dim))
+        mask_invalid = np.zeros((grid_dim, grid_dim), dtype=bool)
+
+        # Grid performance calculation (cumulative up to target_step)
+        for i, icm in enumerate(grid_indices):
+            for j, rnd in enumerate(grid_indices):
+                if round(icm + rnd, 3) > 0.9:
+                    mask_invalid[i, j] = True
+                    continue
+
+                match = curr_eval_df[
+                    (np.isclose(curr_eval_df["icm_weight"], icm, atol=1e-3))
+                    & (np.isclose(curr_eval_df["rnd_weight"], rnd, atol=1e-3))
+                ]
+                if match.empty:
+                    continue
+
+                seed_perfs = []
+                for _, row in match.iterrows():
+                    hist = row.get("history")
+                    if hist is None or hist.empty or metric_col not in hist.columns:
+                        continue
+
+                    valid_hists = hist[hist["eval/total_steps"] <= target_step]
+                    if not valid_hists.empty:
+                        seed_perfs.append(valid_hists.iloc[-1][metric_col])
+
+                if seed_perfs:
+                    mean_perf = np.mean(seed_perfs)
+                    grid_pct[i, j] = (mean_perf / max_score) * 100.0
+
+        # Alpha frequency calculation using sliding window
+        all_alpha_histories = []
+        for _, row in curr_df.iterrows():
+            alpha_hist = row.get("alpha_history")
+            if alpha_hist is not None and not alpha_hist.empty and "run/total_env_steps" in alpha_hist.columns:
+                # Use sliding window: from (target_step - window_size) to target_step
+                valid_alpha = alpha_hist[
+                    (alpha_hist["run/total_env_steps"] > window_start_step)
+                    & (alpha_hist["run/total_env_steps"] <= target_step)
+                ]
+                all_alpha_histories.append(valid_alpha)
+
+        if all_alpha_histories:
+            combined_alpha = pd.concat(all_alpha_histories)
+            icm_vals = combined_alpha["alpha_icm"].values
+            rnd_vals = combined_alpha["alpha_rnd"].values
+
+            for icm_val, rnd_val in zip(icm_vals, rnd_vals):
+                i_idx = np.abs(grid_indices - icm_val).argmin()
+                j_idx = np.abs(grid_indices - rnd_val).argmin()
+                grid_freq[i_idx, j_idx] += 1
+
+            max_freq = grid_freq.max()
+            if max_freq > 0:
+                grid_freq = grid_freq / max_freq
+
+        ax.set_facecolor("lightgray")
+        sns.heatmap(
+            grid_pct,
+            cmap=cmap,
+            annot=False,
+            fmt=".0f",
+            vmin=0.0,
+            vmax=100.0,
+            xticklabels=grid_indices,
+            yticklabels=grid_indices,
+            cbar=False,
+            ax=ax,
+            alpha=0.8,
+            square=True,
+            linewidths=0,
+            rasterized=True,
+        )
+
+        sns.heatmap(
+            mask_invalid,
+            mask=~mask_invalid,
+            cmap=ListedColormap(["black"]),
+            cbar=False,
+            xticklabels=grid_indices,
+            yticklabels=grid_indices,
+            ax=ax,
+            square=True,
+            linewidths=0,
+            rasterized=True,
+        )
+
+        if len(np.unique(grid_freq)) > 1:
+            x_coords, y_coords = np.meshgrid(np.arange(0.5, grid_dim + 0.5, 1), np.arange(0.5, grid_dim + 0.5, 1))
+            contour_levels = np.linspace(0.1, 0.9, 5)
+            black_line_width = 1.2
+
+            ax.contour(
+                x_coords,
+                y_coords,
+                grid_freq,
+                levels=contour_levels,
+                colors="black",
+                linewidths=black_line_width,
+                alpha=1.0,
+            )
+            contours = ax.contour(
+                x_coords,
+                y_coords,
+                grid_freq,
+                levels=contour_levels,
+                colors="white",
+                linewidths=0.8,
+                alpha=1.0,
+            )
+
+            # Show contour values directly on the lines
+            labels = ax.clabel(contours, inline=True, fontsize=5, fmt="%.1f")
+            plt.setp(labels, path_effects=[pe.withStroke(linewidth=black_line_width, foreground="black")])
+
+            # Keep a direct label anchored near the top-right contour area
+            try:
+                allsegs = contours.allsegs[0]
+                if len(allsegs) > 0:
+                    vertices = np.concatenate([seg for seg in allsegs])
+                    target_pt = vertices[np.argmax(vertices[:, 0] + vertices[:, 1])]
+                    ax.annotate(
+                        "Sampling frequency",
+                        xy=(target_pt[0], target_pt[1]),
+                        xytext=(grid_dim - 0.25, grid_dim - 0.55),
+                        xycoords="data",
+                        textcoords="data",
+                        ha="right",
+                        va="center",
+                        fontsize=6,
+                        fontweight="bold",
+                        color="white",
+                        arrowprops=dict(arrowstyle="->", color="white", lw=0.8, shrinkA=0, shrinkB=3),
+                    )
+            except (IndexError, ValueError):
+                pass
+
+        # Title showing the window range
+        window_start_pct = max(0, float(pct) - window_size) * 100
+        window_end_pct = float(pct) * 100
+        window_start_label = f"{window_start_pct:.1f}".rstrip("0").rstrip(".")
+        window_end_label = f"{window_end_pct:.1f}".rstrip("0").rstrip(".")
+        ax.set_title(f"From {window_start_label}% to {window_end_label}% of training", fontsize=7)
+        ax.tick_params(left=False, bottom=False)
+        ax.tick_params(axis="x", rotation=45)
+        if idx < 4:
+            ax.tick_params(axis="x", labelbottom=False, bottom=False)
+        else:
+            ax.tick_params(axis="x", labelbottom=True)
+        if idx % 4 > 0:
+            ax.tick_params(labelleft=False)
+        ax.invert_yaxis()
+        ax.set_xlabel("")
+        ax.set_ylabel("")
+
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=plt.Normalize(vmin=0.0, vmax=100.0))
+    sm.set_array([])
+    cbar = fig.colorbar(sm, cax=cax)
+    cbar.set_label("Return (% of max)")
+
+    fig.supxlabel("RND weight", y=0.05)
+    fig.supylabel("ICM weight", x=0.02)
+    fig.suptitle(
+        f"{_format_achievement_name_for_title(achievement_filter)}",
+        y=0.98,
+        fontsize=10,
+    )
+    fig.subplots_adjust(left=0.06, right=0.94, top=0.90, bottom=0.15, wspace=0.03, hspace=0.12)
+
+    filename = f"plot_4_combined_sliding_window_{achievement_filter}.pdf"
+    save_path = os.path.join(save_dir, filename)
+    fig.savefig(save_path, format="pdf", bbox_inches="tight")
+    print(f"Saved combined Plot 4 sliding window figure to {save_path}")
     plt.close(fig)
 
 

@@ -7,7 +7,9 @@ from curemix.experiments.plots.plot_functions import (
     plot_1_combined_heatmaps,
     plot_2_combined_learning_curves,
     plot_3_combined_curriculum_adaptation,
+    plot_3_combined_curriculum_adaptation_2x2,
     plot_4_combined_training_stages,
+    plot_4_combined_training_stages_sliding_window,
 )
 
 # ==========================================
@@ -18,6 +20,7 @@ IMAGES_DIR = "images"
 ACHIEVEMENT_FILTER = (
     "all"  # Use "all" to process all available, or specify a specific name like "defeat_skeleton+make_stone_pickaxe"
 )
+SLIDING_WINDOW_SIZE = 0.05  # 5% window for sliding-window Plot 4
 
 
 def _resolve_achievements(filtered_dir: str, requested_achievement: str) -> list[str]:
@@ -62,7 +65,15 @@ if __name__ == "__main__":
         # print(f"{message} Creating plots in {achievement_images_dir}...")
 
         # One Plot 4-style 1x4 figure per achievement in images/
-        plot_4_combined_training_stages(df, IMAGES_DIR, achievement_filter=selected_achievement)
+        # plot_4_combined_training_stages(df, IMAGES_DIR, achievement_filter=selected_achievement)
+
+        # # One Plot 4-style 2x4 figure with sliding window alpha distribution per achievement in images/
+        # plot_4_combined_training_stages_sliding_window(
+        #     df,
+        #     IMAGES_DIR,
+        #     achievement_filter=selected_achievement,
+        #     window_size=SLIDING_WINDOW_SIZE,
+        # )
 
         # plot_1_heatmaps(df, str(achievement_images_dir), achievement_filter=selected_achievement)
         # plot_2_learning_curves(df, str(achievement_images_dir), achievement_filter=selected_achievement)
@@ -80,6 +91,7 @@ if __name__ == "__main__":
         images_root.mkdir(parents=True, exist_ok=True)
         plot_1_combined_heatmaps(combined_plot_data, str(images_root))
         plot_2_combined_learning_curves(combined_plot_data, str(images_root))
-        plot_3_combined_curriculum_adaptation(combined_plot_data, str(images_root))
+        # plot_3_combined_curriculum_adaptation(combined_plot_data, str(images_root))
+        plot_3_combined_curriculum_adaptation_2x2(combined_plot_data, str(images_root))
 
     print("\nDone. Plots generated from filtered artifacts.")
